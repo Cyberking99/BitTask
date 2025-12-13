@@ -93,3 +93,7 @@
 (define-read-only (get-nonce)
     (var-get task-nonce)
 )
+
+(define-read-only (get-tasks (id-list (list 200 uint)))
+    (map get-task id-list)
+)

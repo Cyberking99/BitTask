@@ -90,4 +90,73 @@ describe('bittask contract', () => {
             'created-at': Cl.uint(simnet.blockHeight)
         }));
     });
+    it('ensure that get-tasks returns multiple tasks', () => {
+        const amount = 500;
+        const deadline = simnet.blockHeight + 100;
+
+        // Create Task 1
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Task 1"),
+                Cl.stringAscii("Desc 1"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+        const height1 = simnet.blockHeight;
+
+        // Create Task 2
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Task 2"),
+                Cl.stringAscii("Desc 2"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+        const height2 = simnet.blockHeight;
+
+        // Fetch both tasks and a non-existent one
+        const tasks = simnet.callReadOnlyFn(
+            'bittask',
+            'get-tasks',
+            [Cl.list([Cl.uint(1), Cl.uint(2), Cl.uint(99)])], // 99 does not exist
+            deployer
+        );
+
+        const expectedTask1 = Cl.tuple({
+            title: Cl.stringAscii("Task 1"),
+            description: Cl.stringAscii("Desc 1"),
+            creator: Cl.principal(wallet1),
+            worker: Cl.none(),
+            amount: Cl.uint(amount),
+            deadline: Cl.uint(deadline),
+            status: Cl.stringAscii("open"),
+            'created-at': Cl.uint(height1)
+        });
+
+        const expectedTask2 = Cl.tuple({
+            title: Cl.stringAscii("Task 2"),
+            description: Cl.stringAscii("Desc 2"),
+            creator: Cl.principal(wallet1),
+            worker: Cl.none(),
+            amount: Cl.uint(amount),
+            deadline: Cl.uint(deadline),
+            status: Cl.stringAscii("open"),
+            'created-at': Cl.uint(height2)
+        });
+
+        // Expect list of 3 items: Some(Task1), Some(Task2), None
+        expect(tasks.result).toBeList([
+            Cl.some(expectedTask1),
+            Cl.some(expectedTask2),
+            Cl.none()
+        ]);
+    });
 });
