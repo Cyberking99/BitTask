@@ -51,7 +51,7 @@
         (asserts! (> amount u0) ERR-ZERO-AMOUNT)
 
         ;; Check deadline is in future
-        (asserts! (> deadline block-height) ERR-PAST-DEADLINE)
+        (asserts! (> deadline stacks-block-height) ERR-PAST-DEADLINE)
 
         ;; Transfer STX from creator to contract
         (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
@@ -65,7 +65,7 @@
             amount: amount,
             deadline: deadline,
             status: "open",
-            created-at: block-height,
+            created-at: stacks-block-height,
         })
 
         ;; Increment nonce

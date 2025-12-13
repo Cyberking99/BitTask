@@ -7,7 +7,7 @@ cache_dir = "./.cache"
 
 [contracts.bittask]
 path = "contracts/bittask.clar"
-epoch = "2.5"
+epoch = "3.0"
 
 [repl.analysis]
 passes = ["check_checker"]
