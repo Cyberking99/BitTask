@@ -276,4 +276,289 @@ describe('bittask contract', () => {
         );
         expect(result.result).toBeErr(Cl.uint(106)); // ERR-NOT-OPEN
     });
+
+    it('ensure that worker can submit work', () => {
+        const amount = 500;
+        const deadline = simnet.blockHeight + 100;
+        const user2 = accounts.get("wallet_2")!;
+        const proofHash = Cl.buffer(Buffer.from("a".repeat(64), "hex"));
+
+        // Create Task
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Task to Submit"),
+                Cl.stringAscii("Description"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+
+        // Accept Task
+        simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            user2
+        );
+
+        // Submit Work
+        const result = simnet.callPublicFn(
+            'bittask',
+            'submit-work',
+            [Cl.uint(1), proofHash],
+            user2
+        );
+        expect(result.result).toBeOk(Cl.bool(true));
+
+        // Verify Task Status
+        const task = simnet.callReadOnlyFn(
+            'bittask',
+            'get-task',
+            [Cl.uint(1)],
+            deployer
+        );
+
+        expect(task.result).toBeSome(Cl.tuple({
+            title: Cl.stringAscii("Task to Submit"),
+            description: Cl.stringAscii("Description"),
+            creator: Cl.principal(wallet1),
+            worker: Cl.some(Cl.principal(user2)),
+            amount: Cl.uint(amount),
+            deadline: Cl.uint(deadline),
+            status: Cl.stringAscii("submitted"),
+            'created-at': Cl.uint(simnet.blockHeight - 2)
+        }));
+    });
+
+    it('ensure that only assigned worker can submit work', () => {
+        const amount = 500;
+        const deadline = simnet.blockHeight + 100;
+        const user2 = accounts.get("wallet_2")!;
+        const user3 = accounts.get("wallet_3")!;
+        const proofHash = Cl.buffer(Buffer.from("b".repeat(64), "hex"));
+
+        // Create Task
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Task for Worker"),
+                Cl.stringAscii("Description"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+
+        // Accept Task (User 2)
+        simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            user2
+        );
+
+        // Try to Submit Work as Different User (User 3)
+        const result = simnet.callPublicFn(
+            'bittask',
+            'submit-work',
+            [Cl.uint(1), proofHash],
+            user3
+        );
+        expect(result.result).toBeErr(Cl.uint(109)); // ERR-NOT-WORKER
+    });
+
+    it('ensure that work cannot be submitted if task not in-progress', () => {
+        const amount = 500;
+        const deadline = simnet.blockHeight + 100;
+        const user2 = accounts.get("wallet_2")!;
+        const proofHash = Cl.buffer(Buffer.from("c".repeat(64), "hex"));
+
+        // Create Task
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Task Not Accepted"),
+                Cl.stringAscii("Description"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+
+        // Accept Task
+        simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            user2
+        );
+
+        // Submit Work
+        simnet.callPublicFn(
+            'bittask',
+            'submit-work',
+            [Cl.uint(1), proofHash],
+            user2
+        );
+
+        // Try to Submit Work Again (should fail - not in-progress anymore)
+        const result = simnet.callPublicFn(
+            'bittask',
+            'submit-work',
+            [Cl.uint(1), proofHash],
+            user2
+        );
+        expect(result.result).toBeErr(Cl.uint(108)); // ERR-NOT-IN-PROGRESS
+    });
+
+    it('ensure that creator can approve work and funds are transferred', () => {
+        const amount = 500;
+        const deadline = simnet.blockHeight + 100;
+        const user2 = accounts.get("wallet_2")!;
+        const proofHash = Cl.buffer(Buffer.from("d".repeat(64), "hex"));
+
+        // Create Task
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Task to Approve"),
+                Cl.stringAscii("Description"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+
+        // Accept Task
+        simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            user2
+        );
+
+        // Submit Work
+        simnet.callPublicFn(
+            'bittask',
+            'submit-work',
+            [Cl.uint(1), proofHash],
+            user2
+        );
+
+        // Approve Work
+        const result = simnet.callPublicFn(
+            'bittask',
+            'approve-work',
+            [Cl.uint(1)],
+            wallet1
+        );
+        expect(result.result).toBeOk(Cl.bool(true));
+
+        // Verify Task Status
+        const task = simnet.callReadOnlyFn(
+            'bittask',
+            'get-task',
+            [Cl.uint(1)],
+            deployer
+        );
+
+        expect(task.result).toBeSome(Cl.tuple({
+            title: Cl.stringAscii("Task to Approve"),
+            description: Cl.stringAscii("Description"),
+            creator: Cl.principal(wallet1),
+            worker: Cl.some(Cl.principal(user2)),
+            amount: Cl.uint(amount),
+            deadline: Cl.uint(deadline),
+            status: Cl.stringAscii("completed"),
+            'created-at': Cl.uint(simnet.blockHeight - 3)
+        }));
+    });
+
+    it('ensure that only creator can approve work', () => {
+        const amount = 500;
+        const deadline = simnet.blockHeight + 100;
+        const user2 = accounts.get("wallet_2")!;
+        const user3 = accounts.get("wallet_3")!;
+        const proofHash = Cl.buffer(Buffer.from("e".repeat(64), "hex"));
+
+        // Create Task
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Task for Creator"),
+                Cl.stringAscii("Description"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+
+        // Accept Task
+        simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            user2
+        );
+
+        // Submit Work
+        simnet.callPublicFn(
+            'bittask',
+            'submit-work',
+            [Cl.uint(1), proofHash],
+            user2
+        );
+
+        // Try to Approve as Different User (User 3)
+        const result = simnet.callPublicFn(
+            'bittask',
+            'approve-work',
+            [Cl.uint(1)],
+            user3
+        );
+        expect(result.result).toBeErr(Cl.uint(110)); // ERR-NOT-CREATOR
+    });
+
+    it('ensure that work cannot be approved if not submitted', () => {
+        const amount = 500;
+        const deadline = simnet.blockHeight + 100;
+        const user2 = accounts.get("wallet_2")!;
+
+        // Create Task
+        simnet.callPublicFn(
+            'bittask',
+            'create-task',
+            [
+                Cl.stringAscii("Task Not Submitted"),
+                Cl.stringAscii("Description"),
+                Cl.uint(amount),
+                Cl.uint(deadline)
+            ],
+            wallet1
+        );
+
+        // Accept Task
+        simnet.callPublicFn(
+            'bittask',
+            'accept-task',
+            [Cl.uint(1)],
+            user2
+        );
+
+        // Try to Approve Without Submitting
+        const result = simnet.callPublicFn(
+            'bittask',
+            'approve-work',
+            [Cl.uint(1)],
+            wallet1
+        );
+        expect(result.result).toBeErr(Cl.uint(111)); // ERR-NOT-SUBMITTED
+    });
 });
