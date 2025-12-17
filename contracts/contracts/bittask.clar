@@ -10,6 +10,10 @@
 (define-constant ERR-EMPTY-DESCRIPTION (err u105))
 (define-constant ERR-NOT-OPEN (err u106))
 (define-constant ERR-CREATOR-CANNOT-ACCEPT (err u107))
+(define-constant ERR-NOT-IN-PROGRESS (err u108))
+(define-constant ERR-NOT-WORKER (err u109))
+(define-constant ERR-NOT-CREATOR (err u110))
+(define-constant ERR-NOT-SUBMITTED (err u111))
 
 ;; Data Vars
 (define-data-var task-nonce uint u0)
@@ -114,6 +118,72 @@
         })
 
         (ok true)
+    )
+)
+
+;; @desc Submit work for a task
+;; @param id uint - Task ID
+;; @param proof-hash (buff 32) - IPFS hash of proof of work
+(define-public (submit-work (id uint) (proof-hash (buff 32)))
+    (let ((task (unwrap! (map-get? Tasks id) ERR-INVALID-ID)))
+        ;; Check that sender is the assigned worker
+        (asserts! (is-eq (some tx-sender) (get worker task)) ERR-NOT-WORKER)
+
+        ;; Check that status is in-progress
+        (asserts! (is-eq (get status task) "in-progress") ERR-NOT-IN-PROGRESS)
+
+        ;; Update task status to submitted
+        (map-set Tasks id
+            (merge task {
+                status: "submitted",
+            })
+        )
+
+        ;; Emit event
+        (print {
+            event: "submitted",
+            id: id,
+            worker: tx-sender,
+            proof-hash: proof-hash,
+        })
+
+        (ok true)
+    )
+)
+
+;; @desc Approve work and release payment to worker
+;; @param id uint - Task ID
+(define-public (approve-work (id uint))
+    (let ((task (unwrap! (map-get? Tasks id) ERR-INVALID-ID)))
+        ;; Check that sender is the creator
+        (asserts! (is-eq tx-sender (get creator task)) ERR-NOT-CREATOR)
+
+        ;; Check that status is submitted
+        (asserts! (is-eq (get status task) "submitted") ERR-NOT-SUBMITTED)
+
+        ;; Get the worker (should exist at this point)
+        (let ((worker (unwrap! (get worker task) ERR-NOT-WORKER)))
+            ;; Transfer STX from contract to worker
+            (try! (as-contract (stx-transfer? (get amount task) tx-sender worker)))
+
+            ;; Update task status to completed
+            (map-set Tasks id
+                (merge task {
+                    status: "completed",
+                })
+            )
+
+            ;; Emit event
+            (print {
+                event: "approved",
+                id: id,
+                creator: tx-sender,
+                worker: worker,
+                amount: (get amount task),
+            })
+
+            (ok true)
+        )
     )
 )
 
