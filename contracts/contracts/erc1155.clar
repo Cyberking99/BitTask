@@ -155,6 +155,40 @@
     )
 )
 
+;; Single Token Transfer Functions
+
+;; @desc Transfer a single token type from one address to another
+;; @param from: The sender's address
+;; @param to: The recipient's address
+;; @param token-id: The token ID to transfer
+;; @param amount: The amount to transfer
+;; @returns: Success response
+(define-public (transfer-single (from principal) (to principal) (token-id uint) (amount uint))
+    (let ((sender-balance (get-balance from token-id)))
+        ;; Input validation
+        (asserts! (> amount u0) ERR-ZERO-AMOUNT)
+        (asserts! (not (is-eq from to)) ERR-SELF-TRANSFER)
+        (asserts! (>= sender-balance amount) ERR-INSUFFICIENT-BALANCE)
+        (asserts! (is-authorized from tx-sender) ERR-UNAUTHORIZED)
+        
+        ;; Update balances
+        (map-set token-balances {owner: from, token-id: token-id} (- sender-balance amount))
+        (map-set token-balances {owner: to, token-id: token-id} (+ (get-balance to token-id) amount))
+        
+        ;; Emit transfer event
+        (print {
+            event: "transfer-single",
+            operator: tx-sender,
+            from: from,
+            to: to,
+            token-id: token-id,
+            amount: amount
+        })
+        
+        (ok true)
+    )
+)
+
 ;; Operator Approval System
 
 ;; @desc Set or unset approval for an operator to manage all caller's tokens
@@ -202,4 +236,93 @@
 ;; @returns: Error if not authorized, ok if authorized
 (define-private (assert-authorized (owner principal))
     (asserts! (is-authorized owner tx-sender) ERR-UNAUTHORIZED)
+)
+
+;; Single Token Transfer Functionality
+
+;; @desc Transfer a single token type from one address to another
+;; @param from: The sender's address
+;; @param to: The recipient's address  
+;; @param token-id: The token ID to transfer
+;; @param amount: The amount to transfer
+;; @returns: Success response
+(define-public (transfer-single (from principal) (to principal) (token-id uint) (amount uint))
+    (begin
+        ;; Input validation
+        (asserts! (> amount u0) ERR-ZERO-AMOUNT)
+        (asserts! (not (is-eq from to)) ERR-SELF-TRANSFER)
+        
+        ;; Authorization check
+        (try! (assert-authorized from))
+        
+        ;; Get current balance
+        (let ((current-balance (get-balance from token-id)))
+            ;; Check sufficient balance
+            (asserts! (>= current-balance amount) ERR-INSUFFICIENT-BALANCE)
+            
+            ;; Update balances
+            (let ((new-from-balance (- current-balance amount))
+                  (current-to-balance (get-balance to token-id))
+                  (new-to-balance (+ current-to-balance amount)))
+                
+                ;; Set new balances
+                (if (> new-from-balance u0)
+                    (map-set token-balances {owner: from, token-id: token-id} new-from-balance)
+                    (map-delete token-balances {owner: from, token-id: token-id})
+                )
+                (map-set token-balances {owner: to, token-id: token-id} new-to-balance)
+                
+                ;; Emit transfer event
+                (print {
+                    event: "transfer-single",
+                    operator: tx-sender,
+                    from: from,
+                    to: to,
+                    token-id: token-id,
+                    amount: amount
+                })
+                
+                (ok true)
+            )
+        )
+    )
+)
+
+;; Helper function for internal transfers (used by mint/burn)
+(define-private (transfer-internal (from (optional principal)) (to (optional principal)) (token-id uint) (amount uint))
+    (begin
+        ;; Handle from balance (decrease or skip if minting)
+        (match from
+            sender (let ((current-balance (get-balance sender token-id)))
+                (asserts! (>= current-balance amount) ERR-INSUFFICIENT-BALANCE)
+                (let ((new-balance (- current-balance amount)))
+                    (if (> new-balance u0)
+                        (map-set token-balances {owner: sender, token-id: token-id} new-balance)
+                        (map-delete token-balances {owner: sender, token-id: token-id})
+                    )
+                )
+            )
+            true ;; Minting - no sender to deduct from
+        )
+        
+        ;; Handle to balance (increase or skip if burning)
+        (match to
+            recipient (let ((current-balance (get-balance recipient token-id)))
+                (map-set token-balances {owner: recipient, token-id: token-id} (+ current-balance amount))
+            )
+            true ;; Burning - no recipient to add to
+        )
+        
+        ;; Emit transfer event
+        (print {
+            event: "transfer",
+            operator: tx-sender,
+            from: from,
+            to: to,
+            token-id: token-id,
+            amount: amount
+        })
+        
+        (ok true)
+    )
 )
