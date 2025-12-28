@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../components/Providers';
 import { showNotification } from '../../lib/notifications';
+import { createTask } from '../../lib/contractActions';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -67,25 +68,73 @@ export default function CreateTaskPage() {
         setIsLoading(true);
 
         try {
-            // Convert deadline to block height (approximately 10 minutes per block on Stacks)
+            // Convert deadline to block height
+            // Stacks blocks are approximately 10 minutes apart
             const deadlineDate = new Date(formData.deadline);
             const now = new Date();
+            
+            if (deadlineDate <= now) {
+                showNotification.error('Deadline must be in the future');
+                setIsLoading(false);
+                return;
+            }
+
+            // Get current block height estimate (we'll fetch it from API if available)
+            // For now, use approximation: ~144 blocks per day (10 min per block)
             const diffMs = deadlineDate.getTime() - now.getTime();
             const diffMinutes = Math.floor(diffMs / (1000 * 60));
-            const blockHeight = Math.floor(diffMinutes / 10) + 1; // Approximate blocks
+            const blocksFromNow = Math.floor(diffMinutes / 10);
+            
+            // Fetch current block height from Stacks API
+            let currentBlockHeight = 0;
+            try {
+                const network = process.env.NEXT_PUBLIC_STACKS_NETWORK === 'mainnet' 
+                    ? 'https://api.stacks.co' 
+                    : 'https://api.testnet.stacks.co';
+                const response = await fetch(`${network}/v2/info`);
+                const info = await response.json();
+                currentBlockHeight = info.stacks_tip_height || 0;
+            } catch (e) {
+                console.warn('Could not fetch current block height, using approximation', e);
+                // Fallback: assume we're at a reasonable block height
+                currentBlockHeight = 100000; // Approximate current mainnet height
+            }
 
-            // TODO: Call create-task contract function
-            // For now, show success notification
-            showNotification.success('Task created successfully!', 'Redirecting to marketplace...');
+            const deadlineBlockHeight = currentBlockHeight + blocksFromNow + 1;
 
-            // Simulate delay and redirect
-            setTimeout(() => {
-                router.push('/marketplace');
-            }, 2000);
+            // Convert amount to number
+            const amount = parseFloat(formData.amount);
+
+            // Call create-task contract function
+            await createTask(
+                formData.title.trim(),
+                formData.description.trim(),
+                amount, // Will be converted to micro-STX in contractActions
+                deadlineBlockHeight,
+                {
+                    onFinish: (data) => {
+                        console.log('Task created successfully:', data);
+                        showNotification.success(
+                            'Task created successfully!', 
+                            'Your transaction is being processed...'
+                        );
+                        // Redirect after a short delay
+                        setTimeout(() => {
+                            router.push('/marketplace');
+                        }, 1500);
+                    },
+                    onCancel: () => {
+                        showNotification.error('Transaction cancelled', 'Task creation was cancelled');
+                        setIsLoading(false);
+                    },
+                }
+            );
         } catch (error) {
             console.error('Failed to create task', error);
-            showNotification.error('Failed to create task', 'Please try again');
-        } finally {
+            showNotification.error(
+                'Failed to create task', 
+                error instanceof Error ? error.message : 'Please try again'
+            );
             setIsLoading(false);
         }
     };
