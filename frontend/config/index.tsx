@@ -68,3 +68,4 @@ export const metadata = {
     icons: ['https://avatars.githubusercontent.com/u/179229932']
 }
 // Updated networks
+// Updated adapter
