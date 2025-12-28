@@ -83,3 +83,11 @@
         (ok true)
     )
 )
+(define-public (set-contract-owner (new-owner principal))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-UNAUTHORIZED)
+        (var-set contract-owner new-owner)
+        (print {action: "ownership-transfer", old-owner: tx-sender, new-owner: new-owner})
+        (ok true)
+    )
+)
