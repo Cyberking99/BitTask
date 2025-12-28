@@ -494,6 +494,75 @@
     }
 )
 
+;; Emergency Functions and Pause Mechanism
+
+;; Contract pause state
+(define-data-var contract-paused bool false)
+
+;; @desc Pause the contract (owner only)
+;; @returns: Success response
+(define-public (pause-contract)
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-UNAUTHORIZED)
+        (asserts! (not (var-get contract-paused)) ERR-UNAUTHORIZED) ;; Already paused
+        
+        (var-set contract-paused true)
+        
+        (print {
+            event: "contract-paused",
+            paused-by: tx-sender
+        })
+        
+        (ok true)
+    )
+)
+
+;; @desc Unpause the contract (owner only)
+;; @returns: Success response
+(define-public (unpause-contract)
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-UNAUTHORIZED)
+        (asserts! (var-get contract-paused) ERR-UNAUTHORIZED) ;; Not paused
+        
+        (var-set contract-paused false)
+        
+        (print {
+            event: "contract-unpaused",
+            unpaused-by: tx-sender
+        })
+        
+        (ok true)
+    )
+)
+
+;; @desc Check if contract is paused
+;; @returns: True if paused, false otherwise
+(define-read-only (is-paused)
+    (var-get contract-paused)
+)
+
+;; @desc Emergency function to recover accidentally sent tokens (owner only)
+;; @param token-contract: The token contract to recover from
+;; @param amount: Amount to recover
+;; @returns: Success response
+(define-public (emergency-withdraw (amount uint))
+    (begin
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-UNAUTHORIZED)
+        (asserts! (> amount u0) ERR-ZERO-AMOUNT)
+        
+        ;; Transfer STX from contract to owner
+        (try! (as-contract (stx-transfer? amount tx-sender (var-get contract-owner))))
+        
+        (print {
+            event: "emergency-withdrawal",
+            amount: amount,
+            withdrawn-by: tx-sender
+        })
+        
+        (ok true)
+    )
+)
+
 ;; Operator Approval System
 
 ;; @desc Set or unset approval for an operator to manage all caller's tokens
