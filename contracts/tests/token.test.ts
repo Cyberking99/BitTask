@@ -16,3 +16,10 @@ describe('BitToken Contract', () => {
     expect(decimals.result).toBeOk(Cl.uint(6));
   });
 });
+  it('should have correct total supply and initial balance', () => {
+    const totalSupply = simnet.callReadOnlyFn('token', 'get-total-supply', [], deployer);
+    const deployerBalance = simnet.callReadOnlyFn('token', 'get-balance', [Cl.principal(deployer)], deployer);
+    
+    expect(totalSupply.result).toBeOk(Cl.uint(1000000000000));
+    expect(deployerBalance.result).toBeOk(Cl.uint(1000000000000));
+  });
