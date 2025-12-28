@@ -131,3 +131,15 @@ describe('BitToken Contract', () => {
     const aliceBalance = simnet.callReadOnlyFn('token', 'get-balance', [Cl.principal(alice)], deployer);
     expect(aliceBalance.result).toBeOk(Cl.uint(mintAmount));
   });
+  it('should fail mint when not contract owner', () => {
+    const mintAmount = 10000;
+    
+    const mint = simnet.callPublicFn(
+      'token', 
+      'mint', 
+      [Cl.uint(mintAmount), Cl.principal(alice)], 
+      alice // Alice trying to mint
+    );
+    
+    expect(mint.result).toBeErr(Cl.uint(3)); // ERR-UNAUTHORIZED
+  });
