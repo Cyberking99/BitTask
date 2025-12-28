@@ -99,3 +99,20 @@ describe('BitToken Contract', () => {
     );
     expect(remainingAllowance.result).toBeOk(Cl.uint(approveAmount - transferAmount));
   });
+  it('should fail transfer-from with insufficient allowance', () => {
+    const approveAmount = 1000;
+    const transferAmount = 2000;
+    
+    // First approve smaller amount
+    simnet.callPublicFn('token', 'approve', [Cl.principal(alice), Cl.uint(approveAmount)], deployer);
+    
+    // Try to transfer more than allowed
+    const transferFrom = simnet.callPublicFn(
+      'token', 
+      'transfer-from', 
+      [Cl.uint(transferAmount), Cl.principal(deployer), Cl.principal(bob), Cl.none()], 
+      alice
+    );
+    
+    expect(transferFrom.result).toBeErr(Cl.uint(2)); // ERR-INSUFFICIENT-ALLOWANCE
+  });
