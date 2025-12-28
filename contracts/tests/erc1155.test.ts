@@ -44,4 +44,53 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(result.result).toBeOk(Cl.bool(false));
     });
   });
+
+  describe("Token Minting", () => {
+    it("should allow owner to mint new tokens", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(100)],
+        deployer
+      );
+      expect(result.result).toBeOk(Cl.uint(1));
+    });
+
+    it("should update balance after minting", () => {
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(100)],
+        deployer
+      );
+      
+      const balance = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(alice), Cl.uint(1)],
+        deployer
+      );
+      expect(balance.result).toBeOk(Cl.uint(100));
+    });
+
+    it("should reject minting by non-owner", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(100)],
+        alice
+      );
+      expect(result.result).toBeErr(Cl.uint(101)); // ERR-UNAUTHORIZED
+    });
+
+    it("should reject minting zero amount", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(0)],
+        deployer
+      );
+      expect(result.result).toBeErr(Cl.uint(103)); // ERR-ZERO-AMOUNT
+    });
+  });
 });
