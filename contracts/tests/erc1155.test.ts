@@ -141,4 +141,73 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(balance.result).toBeOk(Cl.uint(0));
     });
   });
+
+  describe("Single Token Transfers", () => {
+    beforeEach(() => {
+      // Mint tokens for testing
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(100)],
+        deployer
+      );
+    });
+
+    it("should transfer tokens successfully", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "transfer-single",
+        [Cl.principal(alice), Cl.principal(bob), Cl.uint(1), Cl.uint(30)],
+        alice
+      );
+      expect(result.result).toBeOk(Cl.bool(true));
+
+      // Check balances
+      const aliceBalance = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(alice), Cl.uint(1)],
+        deployer
+      );
+      const bobBalance = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(bob), Cl.uint(1)],
+        deployer
+      );
+      
+      expect(aliceBalance.result).toBeOk(Cl.uint(70));
+      expect(bobBalance.result).toBeOk(Cl.uint(30));
+    });
+
+    it("should reject transfer with insufficient balance", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "transfer-single",
+        [Cl.principal(alice), Cl.principal(bob), Cl.uint(1), Cl.uint(200)],
+        alice
+      );
+      expect(result.result).toBeErr(Cl.uint(100)); // ERR-INSUFFICIENT-BALANCE
+    });
+
+    it("should reject zero amount transfer", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "transfer-single",
+        [Cl.principal(alice), Cl.principal(bob), Cl.uint(1), Cl.uint(0)],
+        alice
+      );
+      expect(result.result).toBeErr(Cl.uint(103)); // ERR-ZERO-AMOUNT
+    });
+
+    it("should reject self-transfer", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "transfer-single",
+        [Cl.principal(alice), Cl.principal(alice), Cl.uint(1), Cl.uint(30)],
+        alice
+      );
+      expect(result.result).toBeErr(Cl.uint(104)); // ERR-SELF-TRANSFER
+    });
+  });
 });
