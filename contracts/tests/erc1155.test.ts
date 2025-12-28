@@ -210,4 +210,61 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(result.result).toBeErr(Cl.uint(104)); // ERR-SELF-TRANSFER
     });
   });
+
+  describe("Operator Approvals", () => {
+    it("should set approval for all tokens", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "set-approval-for-all",
+        [Cl.principal(bob), Cl.bool(true)],
+        alice
+      );
+      expect(result.result).toBeOk(Cl.bool(true));
+
+      const isApproved = simnet.callReadOnlyFn(
+        "erc1155",
+        "is-approved-for-all",
+        [Cl.principal(alice), Cl.principal(bob)],
+        deployer
+      );
+      expect(isApproved.result).toBeOk(Cl.bool(true));
+    });
+
+    it("should revoke approval", () => {
+      // First approve
+      simnet.callPublicFn(
+        "erc1155",
+        "set-approval-for-all",
+        [Cl.principal(bob), Cl.bool(true)],
+        alice
+      );
+
+      // Then revoke
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "set-approval-for-all",
+        [Cl.principal(bob), Cl.bool(false)],
+        alice
+      );
+      expect(result.result).toBeOk(Cl.bool(true));
+
+      const isApproved = simnet.callReadOnlyFn(
+        "erc1155",
+        "is-approved-for-all",
+        [Cl.principal(alice), Cl.principal(bob)],
+        deployer
+      );
+      expect(isApproved.result).toBeOk(Cl.bool(false));
+    });
+
+    it("should reject self-approval", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "set-approval-for-all",
+        [Cl.principal(alice), Cl.bool(true)],
+        alice
+      );
+      expect(result.result).toBeErr(Cl.uint(107)); // ERR-INVALID-PRINCIPAL
+    });
+  });
 });
