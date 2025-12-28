@@ -313,4 +313,54 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(result.result).toBeErr(Cl.uint(101)); // ERR-UNAUTHORIZED
     });
   });
+
+  describe("Token Burning", () => {
+    beforeEach(() => {
+      // Mint tokens for testing
+      simnet.callPublicFn(
+        "erc1155",
+        "mint-tokens",
+        [Cl.principal(alice), Cl.uint(0), Cl.uint(100)],
+        deployer
+      );
+    });
+
+    it("should allow owner to burn tokens", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "burn-tokens",
+        [Cl.principal(alice), Cl.uint(1), Cl.uint(30)],
+        alice
+      );
+      expect(result.result).toBeOk(Cl.bool(true));
+
+      const balance = simnet.callReadOnlyFn(
+        "erc1155",
+        "get-balance",
+        [Cl.principal(alice), Cl.uint(1)],
+        deployer
+      );
+      expect(balance.result).toBeOk(Cl.uint(70));
+    });
+
+    it("should reject burning more than balance", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "burn-tokens",
+        [Cl.principal(alice), Cl.uint(1), Cl.uint(200)],
+        alice
+      );
+      expect(result.result).toBeErr(Cl.uint(100)); // ERR-INSUFFICIENT-BALANCE
+    });
+
+    it("should reject unauthorized burning", () => {
+      const result = simnet.callPublicFn(
+        "erc1155",
+        "burn-tokens",
+        [Cl.principal(alice), Cl.uint(1), Cl.uint(30)],
+        bob
+      );
+      expect(result.result).toBeErr(Cl.uint(101)); // ERR-UNAUTHORIZED
+    });
+  });
 });
