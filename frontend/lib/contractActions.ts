@@ -12,6 +12,7 @@ const network = process.env.NEXT_PUBLIC_STACKS_NETWORK === 'mainnet' ? STACKS_MA
 export interface ContractCallOptions {
   onFinish?: (data: any) => void;
   onCancel?: () => void;
+  onTransactionId?: (txId: string) => void;
 }
 
 const STX_TO_MICROSTX = 1000000; // 1 STX = 1,000,000 micro-STX
@@ -52,6 +53,10 @@ export async function createTask(
       userSession,
       onFinish: (data) => {
         console.log('Task created:', data);
+        const txId = data?.txId || data?.txid || data?.response?.txid || data?.stacksTransaction?.txid();
+        if (txId && options?.onTransactionId) {
+          options.onTransactionId(txId);
+        }
         options?.onFinish?.(data);
       },
       onCancel: () => {
@@ -80,6 +85,10 @@ export async function acceptTask(
       userSession,
       onFinish: (data) => {
         console.log('Task accepted:', data);
+        const txId = data?.txId || data?.txid || data?.response?.txid || data?.stacksTransaction?.txid();
+        if (txId && options?.onTransactionId) {
+          options.onTransactionId(txId);
+        }
         options?.onFinish?.(data);
       },
       onCancel: () => {
@@ -112,6 +121,10 @@ export async function submitWork(
       userSession,
       onFinish: (data) => {
         console.log('Work submitted:', data);
+        const txId = data?.txId || data?.txid || data?.response?.txid || data?.stacksTransaction?.txid();
+        if (txId && options?.onTransactionId) {
+          options.onTransactionId(txId);
+        }
         options?.onFinish?.(data);
       },
       onCancel: () => {
@@ -140,6 +153,10 @@ export async function approveWork(
       userSession,
       onFinish: (data) => {
         console.log('Work approved:', data);
+        const txId = data?.txId || data?.txid || data?.response?.txid || data?.stacksTransaction?.txid();
+        if (txId && options?.onTransactionId) {
+          options.onTransactionId(txId);
+        }
         options?.onFinish?.(data);
       },
       onCancel: () => {

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../components/Providers';
 import { useStacksWallet } from '../../lib/stacks-wallet';
+import { useTransactionTracker } from '../../lib/transactionTracker';
 import { showNotification } from '../../lib/notifications';
 import { createTask } from '../../lib/contractActions';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -20,6 +21,7 @@ export default function CreateTaskPage() {
     const router = useRouter();
     const { isConnected } = useAuth();
     const { userSession } = useStacksWallet();
+    const { addTransaction } = useTransactionTracker();
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
@@ -122,12 +124,20 @@ export default function CreateTaskPage() {
                 amount, // Will be converted to micro-STX in contractActions
                 deadlineBlockHeight,
                 {
+                    onTransactionId: (txId) => {
+                        addTransaction({
+                            txId,
+                            status: 'pending',
+                            timestamp: Date.now(),
+                            type: 'create-task',
+                        });
+                        showNotification.success(
+                            'Transaction submitted!', 
+                            'Your task is being created on the blockchain...'
+                        );
+                    },
                     onFinish: (data) => {
                         console.log('Task created successfully:', data);
-                        showNotification.success(
-                            'Task created successfully!', 
-                            'Your transaction is being processed...'
-                        );
                         // Redirect after a short delay
                         setTimeout(() => {
                             router.push('/marketplace');
