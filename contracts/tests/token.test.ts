@@ -23,3 +23,18 @@ describe('BitToken Contract', () => {
     expect(totalSupply.result).toBeOk(Cl.uint(1000000000000));
     expect(deployerBalance.result).toBeOk(Cl.uint(1000000000000));
   });
+  it('should transfer tokens successfully', () => {
+    const transferAmount = 1000;
+    
+    const transfer = simnet.callPublicFn(
+      'token', 
+      'transfer', 
+      [Cl.uint(transferAmount), Cl.principal(deployer), Cl.principal(alice), Cl.none()], 
+      deployer
+    );
+    
+    expect(transfer.result).toBeOk(Cl.bool(true));
+    
+    const aliceBalance = simnet.callReadOnlyFn('token', 'get-balance', [Cl.principal(alice)], deployer);
+    expect(aliceBalance.result).toBeOk(Cl.uint(transferAmount));
+  });
