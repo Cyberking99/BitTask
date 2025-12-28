@@ -143,3 +143,18 @@ describe('BitToken Contract', () => {
     
     expect(mint.result).toBeErr(Cl.uint(3)); // ERR-UNAUTHORIZED
   });
+  it('should burn tokens successfully', () => {
+    const transferAmount = 5000;
+    const burnAmount = 2000;
+    
+    // First transfer some tokens to alice
+    simnet.callPublicFn('token', 'transfer', [Cl.uint(transferAmount), Cl.principal(deployer), Cl.principal(alice), Cl.none()], deployer);
+    
+    // Alice burns some tokens
+    const burn = simnet.callPublicFn('token', 'burn', [Cl.uint(burnAmount)], alice);
+    
+    expect(burn.result).toBeOk(Cl.bool(true));
+    
+    const aliceBalance = simnet.callReadOnlyFn('token', 'get-balance', [Cl.principal(alice)], deployer);
+    expect(aliceBalance.result).toBeOk(Cl.uint(transferAmount - burnAmount));
+  });
