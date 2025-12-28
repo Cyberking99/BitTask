@@ -11,3 +11,10 @@
 (define-constant ERR-INSUFFICIENT-BALANCE (err u1))
 (define-constant ERR-INSUFFICIENT-ALLOWANCE (err u2))
 (define-constant ERR-UNAUTHORIZED (err u3))
+
+;; Data variables
+(define-data-var contract-owner principal tx-sender)
+
+;; Data maps
+(define-map balances principal uint)
+(define-map allowances {owner: principal, spender: principal} uint)
