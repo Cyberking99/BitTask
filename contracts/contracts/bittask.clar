@@ -169,15 +169,17 @@
 
         ;; Get worker principal
         (let ((worker-principal (unwrap! (get worker task) ERR-NOT-WORKER)))
-            ;; Transfer STX from contract to worker
-            (try! (as-contract (stx-transfer? (get amount task) tx-sender worker-principal)))
-
-            ;; Update task status
+            ;; Update task status before transfer to prevent re-entrancy attacks
+            ;; Following Checks-Effects-Interactions pattern: update state (Effect) before external call (Interaction)
             (map-set Tasks id
                 (merge task {
                     status: "completed",
                 })
             )
+
+            ;; Transfer STX from contract to worker
+            ;; If transfer fails, entire transaction (including state change) will be reverted
+            (try! (as-contract (stx-transfer? (get amount task) tx-sender worker-principal)))
 
             ;; Emit event
             (print {

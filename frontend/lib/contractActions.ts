@@ -14,17 +14,19 @@ export interface ContractCallOptions {
   onCancel?: () => void;
 }
 
+const STX_TO_MICROSTX = 1000000; // 1 STX = 1,000,000 micro-STX
+
 export async function createTask(
   userSession: UserSession,
   title: string,
   description: string,
-  amount: number, // in micro-STX (1 STX = 1,000,000 micro-STX)
+  amount: number, // in STX
   deadline: number, // block height
   options?: ContractCallOptions
 ): Promise<void> {
   try {
-    // Convert STX to micro-STX if needed (assuming amount is in STX)
-    const amountMicroSTX = amount < 1000000 ? amount * 1000000 : amount;
+    // Convert STX to micro-STX. Use Math.round to handle potential floating point inaccuracies.
+    const amountMicroSTX = Math.round(amount * STX_TO_MICROSTX);
     
     // Create post-condition to ensure only the specified amount is transferred
     const postConditions = [
