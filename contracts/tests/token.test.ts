@@ -181,3 +181,17 @@ describe('BitToken Contract', () => {
     
     expect(setOwner.result).toBeErr(Cl.uint(3)); // ERR-UNAUTHORIZED
   });
+  it('should handle zero balance accounts correctly', () => {
+    const charlie = accounts.get('wallet_3')!;
+    
+    const charlieBalance = simnet.callReadOnlyFn('token', 'get-balance', [Cl.principal(charlie)], deployer);
+    expect(charlieBalance.result).toBeOk(Cl.uint(0));
+    
+    const allowance = simnet.callReadOnlyFn(
+      'token', 
+      'get-allowance', 
+      [Cl.principal(charlie), Cl.principal(alice)], 
+      deployer
+    );
+    expect(allowance.result).toBeOk(Cl.uint(0));
+  });
