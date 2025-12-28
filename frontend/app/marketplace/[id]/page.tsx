@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Task, fetchTasks } from '../../../lib/contracts';
+import { acceptTask, submitWork, approveWork } from '../../../lib/contractActions';
+import { useAuth } from '../../../components/Providers';
+import { showNotification } from '../../../lib/notifications';
 import { ArrowLeft, Loader2, Clock, User, DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
@@ -12,9 +15,13 @@ export default function TaskDetailPage() {
     // Safely parse ID, defaulting to NaN if invalid
     const taskId = params?.id ? parseInt(Array.isArray(params.id) ? params.id[0] : params.id) : NaN;
 
+    const { isConnected, address } = useAuth();
     const [task, setTask] = useState<Task | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isActionLoading, setIsActionLoading] = useState(false);
+    const [showSubmitModal, setShowSubmitModal] = useState(false);
+    const [submissionText, setSubmissionText] = useState('');
 
     useEffect(() => {
         if (isNaN(taskId)) {
@@ -42,6 +49,90 @@ export default function TaskDetailPage() {
 
         loadTask();
     }, [taskId]);
+
+    const reloadTask = async () => {
+        try {
+            const tasks = await fetchTasks();
+            const foundTask = tasks.find(t => t.id === taskId);
+            if (foundTask) {
+                setTask(foundTask);
+            }
+        } catch (err) {
+            console.error('Failed to reload task', err);
+        }
+    };
+
+    const handleAcceptTask = async () => {
+        if (!isConnected) {
+            showNotification.error('Please connect your wallet first');
+            return;
+        }
+
+        setIsActionLoading(true);
+        try {
+            await acceptTask(taskId, {
+                onFinish: async (data) => {
+                    showNotification.success('Task accepted!', 'You are now assigned to this task');
+                    await reloadTask();
+                    setIsActionLoading(false);
+                },
+                onCancel: () => {
+                    setIsActionLoading(false);
+                },
+            });
+        } catch (error) {
+            console.error('Failed to accept task', error);
+            showNotification.error('Failed to accept task', 'Please try again');
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleSubmitWork = async () => {
+        if (!submissionText.trim()) {
+            showNotification.error('Please provide a submission link or description');
+            return;
+        }
+
+        setIsActionLoading(true);
+        try {
+            await submitWork(taskId, submissionText.trim(), {
+                onFinish: async (data) => {
+                    showNotification.success('Work submitted!', 'Waiting for creator approval');
+                    setShowSubmitModal(false);
+                    setSubmissionText('');
+                    await reloadTask();
+                    setIsActionLoading(false);
+                },
+                onCancel: () => {
+                    setIsActionLoading(false);
+                },
+            });
+        } catch (error) {
+            console.error('Failed to submit work', error);
+            showNotification.error('Failed to submit work', 'Please try again');
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleApproveWork = async () => {
+        setIsActionLoading(true);
+        try {
+            await approveWork(taskId, {
+                onFinish: async (data) => {
+                    showNotification.success('Work approved!', 'Payment has been released to the worker');
+                    await reloadTask();
+                    setIsActionLoading(false);
+                },
+                onCancel: () => {
+                    setIsActionLoading(false);
+                },
+            });
+        } catch (error) {
+            console.error('Failed to approve work', error);
+            showNotification.error('Failed to approve work', 'Please try again');
+            setIsActionLoading(false);
+        }
+    };
 
     const safeDate = (timestamp: number) => {
         if (!timestamp || isNaN(timestamp)) return 'No Deadline';
@@ -170,26 +261,46 @@ export default function TaskDetailPage() {
                 <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 space-y-4">
                     <h2 className="text-xl font-bold mb-4">Actions</h2>
 
-                    {task.status === 'open' && !isExpired && (
-                        <button className="w-full py-3 px-6 bg-indigo-600 hover:bg-indigo-700 rounded-lg font-semibold transition-colors">
-                            Accept Task
+                    {!isConnected && (
+                        <div className="text-center py-4 bg-gray-800 rounded-lg">
+                            <p className="text-gray-400">Connect your wallet to interact with tasks</p>
+                        </div>
+                    )}
+
+                    {task.status === 'open' && !isExpired && isConnected && (
+                        <button
+                            onClick={handleAcceptTask}
+                            disabled={isActionLoading || task.creator === address}
+                            className="w-full py-3 px-6 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                        >
+                            {isActionLoading && <Loader2 className="h-5 w-5 animate-spin" />}
+                            {task.creator === address ? 'You created this task' : 'Accept Task'}
                         </button>
                     )}
 
-                    {task.status === 'in-progress' && task.worker && (
-                        <button className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition-colors">
+                    {task.status === 'in-progress' && task.worker === address && isConnected && (
+                        <button
+                            onClick={() => setShowSubmitModal(true)}
+                            disabled={isActionLoading}
+                            className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors"
+                        >
                             Submit Work
                         </button>
                     )}
 
-                    {task.status === 'submitted' && (
+                    {task.status === 'submitted' && task.creator === address && isConnected && (
                         <div className="space-y-3">
-                            <button className="w-full py-3 px-6 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition-colors">
+                            <button
+                                onClick={handleApproveWork}
+                                disabled={isActionLoading}
+                                className="w-full py-3 px-6 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                            >
+                                {isActionLoading && <Loader2 className="h-5 w-5 animate-spin" />}
                                 Approve Work
                             </button>
-                            <button className="w-full py-3 px-6 bg-red-600 hover:bg-red-700 rounded-lg font-semibold transition-colors">
-                                Reject Work
-                            </button>
+                            <div className="text-center py-2 text-sm text-gray-400">
+                                Rejection functionality coming soon
+                            </div>
                         </div>
                     )}
 
@@ -242,6 +353,47 @@ export default function TaskDetailPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* Submit Work Modal */}
+                {showSubmitModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full space-y-4">
+                            <h3 className="text-2xl font-bold">Submit Work</h3>
+                            <p className="text-gray-400 text-sm">
+                                Provide a link, hash, or description of your completed work
+                            </p>
+                            <textarea
+                                value={submissionText}
+                                onChange={(e) => setSubmissionText(e.target.value)}
+                                placeholder="e.g., https://example.com/work or IPFS hash..."
+                                maxLength={256}
+                                rows={4}
+                                className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+                            />
+                            <p className="text-xs text-gray-500">{submissionText.length}/256</p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setShowSubmitModal(false);
+                                        setSubmissionText('');
+                                    }}
+                                    disabled={isActionLoading}
+                                    className="flex-1 py-3 px-6 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 rounded-lg font-semibold transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleSubmitWork}
+                                    disabled={isActionLoading || !submissionText.trim()}
+                                    className="flex-1 py-3 px-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                                >
+                                    {isActionLoading && <Loader2 className="h-5 w-5 animate-spin" />}
+                                    Submit
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
