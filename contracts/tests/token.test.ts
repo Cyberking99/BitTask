@@ -158,3 +158,16 @@ describe('BitToken Contract', () => {
     const aliceBalance = simnet.callReadOnlyFn('token', 'get-balance', [Cl.principal(alice)], deployer);
     expect(aliceBalance.result).toBeOk(Cl.uint(transferAmount - burnAmount));
   });
+  it('should transfer contract ownership', () => {
+    const setOwner = simnet.callPublicFn(
+      'token', 
+      'set-contract-owner', 
+      [Cl.principal(alice)], 
+      deployer
+    );
+    
+    expect(setOwner.result).toBeOk(Cl.bool(true));
+    
+    const newOwner = simnet.callReadOnlyFn('token', 'get-contract-owner', [], deployer);
+    expect(newOwner.result).toBePrincipal(alice);
+  });
