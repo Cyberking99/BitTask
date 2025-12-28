@@ -76,3 +76,10 @@
         (ok true)
     )
 )
+(define-public (burn (amount uint))
+    (begin
+        (try! (ft-burn? amount tx-sender))
+        (print {action: "burn", account: tx-sender, amount: amount})
+        (ok true)
+    )
+)
