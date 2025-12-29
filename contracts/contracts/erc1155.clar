@@ -144,7 +144,7 @@
 (define-public (set-approval-for-all (operator principal) (approved bool))
     (begin
         ;; Check if contract is paused
-        (asserts! (not (var-get contract-paused)) ERR-UNAUTHORIZED)
+        (asserts! (not (var-get contract-paused)) ERR-CONTRACT-PAUSED)
         
         ;; Cannot approve yourself
         (asserts! (not (is-eq tx-sender operator)) ERR-INVALID-PRINCIPAL)
