@@ -931,6 +931,16 @@ describe("ERC1155 Multi-Token Contract", () => {
       expect(nextId.result).toBeOk(Cl.uint(1));
     });
 
+    it("should validate pause state", () => {
+      const paused = simnet.callReadOnlyFn(
+        "erc1155",
+        "is-contract-paused",
+        [],
+        deployer
+      );
+      expect(paused.result).toBeOk(Cl.bool(false));
+    });
+
     it("should handle multiple token types for same user", () => {
       // Mint different token types
       simnet.callPublicFn(
