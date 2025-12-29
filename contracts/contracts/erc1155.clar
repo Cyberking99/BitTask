@@ -189,7 +189,7 @@
 (define-public (transfer-single (from principal) (to principal) (token-id uint) (amount uint))
     (let ((sender-balance (get-balance from token-id)))
         ;; Check if contract is paused
-        (asserts! (not (var-get contract-paused)) ERR-UNAUTHORIZED)
+        (asserts! (not (var-get contract-paused)) ERR-CONTRACT-PAUSED)
         
         ;; Input validation
         (asserts! (> amount u0) ERR-ZERO-AMOUNT)
