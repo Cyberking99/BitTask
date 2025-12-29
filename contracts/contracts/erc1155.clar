@@ -119,6 +119,12 @@
     (var-get deployment-time)
 )
 
+;; @desc Get total tokens created
+;; @returns: Total number of token types created
+(define-read-only (get-total-tokens-created)
+    (var-get total-tokens-created)
+)
+
 ;; @desc Get the next token ID that will be assigned
 ;; @returns: The next available token ID
 (define-read-only (get-next-token-id)
