@@ -843,7 +843,7 @@ describe("ERC1155 Multi-Token Contract", () => {
 
   describe("Edge Cases and Error Handling", () => {
     it("should handle large token amounts", () => {
-      const largeAmount = 1000000000; // 1 billion
+      const largeAmount = 1000000000; // 1B
       const result = simnet.callPublicFn(
         "erc1155",
         "mint-tokens",
