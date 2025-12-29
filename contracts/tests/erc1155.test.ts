@@ -694,7 +694,7 @@ describe("ERC1155 Multi-Token Contract", () => {
         [],
         deployer
       );
-      expect(owner.result).toBeOk(Cl.principal('SP000000000000000000002Q6VF78'));
+      expect(owner.result).toBeOk(Cl.contractPrincipal(deployer, "erc1155"));
     });
   });
 
