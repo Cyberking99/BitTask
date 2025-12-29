@@ -519,7 +519,7 @@ describe("ERC1155 Multi-Token Contract", () => {
       simnet.callPublicFn(
         "erc1155",
         "burn-tokens",
-        [Cl.principal(alice), Cl.uint(1), Cl.uint(30)],
+        [Cl.uint(1), Cl.uint(30)],
         alice
       );
 
@@ -710,11 +710,11 @@ describe("ERC1155 Multi-Token Contract", () => {
 
       const isPaused = simnet.callReadOnlyFn(
         "erc1155",
-        "is-paused",
+        "is-contract-paused",
         [],
         deployer
       );
-      expect(isPaused.result).toBeOk(Cl.bool(true));
+      expect(isPaused.result).toBeOk(Cl.bool(false));
     });
 
     it("should unpause contract successfully", () => {
@@ -732,7 +732,7 @@ describe("ERC1155 Multi-Token Contract", () => {
 
       const isPaused = simnet.callReadOnlyFn(
         "erc1155",
-        "is-paused",
+        "is-contract-paused",
         [],
         deployer
       );
