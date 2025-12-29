@@ -102,6 +102,12 @@
     (var-get contract-version)
 )
 
+;; @desc Get the contract owner
+;; @returns: The principal that owns this contract
+(define-read-only (get-contract-owner)
+    (var-get contract-owner)
+)
+
 ;; @desc Get the next token ID that will be assigned
 ;; @returns: The next available token ID
 (define-read-only (get-next-token-id)
