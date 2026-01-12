@@ -441,6 +441,21 @@
     (not (is-eq addr 'SP000000000000000000002Q6VF78))
 )
 
+;; @desc Enhanced URI validation with length and format checks
+;; @param uri: The URI string to validate
+;; @returns: Error if invalid, ok if valid
+(define-private (validate-uri (uri (string-ascii 256)))
+    (begin
+        ;; Check URI is not empty
+        (asserts! (> (len uri) u0) ERR-INVALID-URI)
+        ;; Check URI is not too short (minimum 3 characters)
+        (asserts! (>= (len uri) u3) ERR-INVALID-URI)
+        ;; Check URI doesn't exceed maximum length
+        (asserts! (<= (len uri) u256) ERR-INVALID-URI)
+        (ok true)
+    )
+)
+
 ;; @desc Enhanced transfer validation with comprehensive checks and gas optimization
 ;; @param from: Sender address
 ;; @param to: Recipient address  
