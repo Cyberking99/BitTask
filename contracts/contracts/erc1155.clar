@@ -19,7 +19,7 @@
 (define-data-var contract-owner principal tx-sender)
 
 ;; Contract version
-(define-data-var contract-version (string-ascii 10) "1.1.0")
+(define-data-var contract-version (string-ascii 10) "1.2.0")
 
 ;; Token ID counter for unique token generation
 (define-data-var next-token-id uint u1)
