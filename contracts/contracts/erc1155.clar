@@ -1438,14 +1438,15 @@
     (get-total-supply token-id)
 )
 
-;; @desc Get comprehensive token information
+;; @desc Get comprehensive token information including creator
 ;; @param token-id: The token ID to query
-;; @returns: Tuple with token existence, total supply, and URI
+;; @returns: Tuple with token existence, total supply, URI, and creator
 (define-read-only (get-token-info (token-id uint))
     {
         exists: (token-exists token-id),
         total-supply: (get-total-supply token-id),
-        uri: (get-token-uri token-id)
+        uri: (get-token-uri token-id),
+        creator: (get-token-creator token-id)
     }
 )
 
