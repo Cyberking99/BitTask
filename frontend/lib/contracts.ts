@@ -68,71 +68,46 @@ export async function fetchTasks(): Promise<Task[]> {
         const tasks: Task[] = results
             .filter(r => r.data && r.data.value) // Filter out nulls or invalid
             .map((r) => {
-                const t = r.data.value; // cvToValue unwraps 'some' to { type, value } or just value?
-                // Actually cvToValue unwraps `some` to its content. 
-                // If the content is a tuple, it returns the JS object.
-                // However, let's look at previous logic. If it returns the object directly:
-                // We need to be careful about what cvToValue returns for `(some (tuple ...))`.
-                // It usually returns the tuple object directly if it unwraps fully.
-                // Let's assume t is the tuple object directly for now based on typical behavior, 
-                // but checking for .value implies we might expect { value: ... } structure.
 
-                // Let's play safe. If t has properties of Task, use t. 
-                // If t has .value which has properties, use t.value.
-                const taskData = t.title ? t : t.value;
-
-                return {
-                    id: r.id,
-                    title: taskData.title.value || taskData.title,
-                    description: taskData.description.value || taskData.description,
-                    creator: taskData.creator.value || taskData.creator,
-                    worker: (taskData.worker && taskData.worker.value) ? taskData.worker.value : (taskData.worker || null),
-                    amount: Number(taskData.amount.value || taskData.amount),
-                    deadline: Number(taskData.deadline.value || taskData.deadline),
-                    status: taskData.status.value || taskData.status
-                };
-            });
-
-
-        return tasks.reverse();
-    } catch (e) {
-        console.error("Error fetching tasks", e);
-        return [];
+                return tasks.reverse();
+            } catch (e) {
+                console.error("Error fetching tasks", e);
+                return [];
+            }
     }
-}
 
 export async function fetchTask(id: number): Promise<Task | null> {
-    try {
-        const result = await fetchCallReadOnlyFunction({
-            contractAddress: CONTRACT_ADDRESS,
-            contractName: CONTRACT_NAME,
-            functionName: 'get-task',
-            functionArgs: [uintCV(id)],
-            senderAddress: CONTRACT_ADDRESS,
-            network,
-        });
+        try {
+            const result = await fetchCallReadOnlyFunction({
+                contractAddress: CONTRACT_ADDRESS,
+                contractName: CONTRACT_NAME,
+                functionName: 'get-task',
+                functionArgs: [uintCV(id)],
+                senderAddress: CONTRACT_ADDRESS,
+                network,
+            });
 
-        const t = cvToValue(result);
-        if (!t) return null;
+            const t = cvToValue(result);
+            if (!t) return null;
 
-        // Check if it's wrapped in 'value' (for response/optional types)
-        const taskData = t.value || t;
+            // Check if it's wrapped in 'value' (for response/optional types)
+            const taskData = t.value || t;
 
-        // Double check structure if it's a tuple inside response
-        if (!taskData.title) return null;
+            // Double check structure if it's a tuple inside response
+            if (!taskData.title) return null;
 
-        return {
-            id: id,
-            title: taskData.title.value || taskData.title,
-            description: taskData.description.value || taskData.description,
-            creator: taskData.creator.value || taskData.creator,
-            worker: (taskData.worker && taskData.worker.value) ? taskData.worker.value : (taskData.worker || null),
-            amount: Number(taskData.amount.value || taskData.amount),
-            deadline: Number(taskData.deadline.value || taskData.deadline),
-            status: taskData.status.value || taskData.status
-        };
-    } catch (e) {
-        console.error(`Error fetching task ${id}`, e);
-        return null;
+            return {
+                id: id,
+                title: taskData.title.value || taskData.title,
+                description: taskData.description.value || taskData.description,
+                creator: taskData.creator.value || taskData.creator,
+                worker: (taskData.worker && taskData.worker.value) ? taskData.worker.value : (taskData.worker || null),
+                amount: Number(taskData.amount.value || taskData.amount),
+                deadline: Number(taskData.deadline.value || taskData.deadline),
+                status: taskData.status.value || taskData.status
+            };
+        } catch (e) {
+            console.error(`Error fetching task ${id}`, e);
+            return null;
+        }
     }
-}
