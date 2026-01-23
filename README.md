@@ -97,17 +97,10 @@ Ensure you have the following installed:
     
     Set `NEXT_PUBLIC_STACKS_NETWORK` to `testnet` for development or `mainnet` for production.
 
+
 ## 🧪 Testing
 
-This project uses Vitest with `vitest-environment-clarinet` for comprehensive unit testing.
-
-To run the tests:
-
-```bash
-cd contracts
-npm install
-npm test
-```
+Detailed testing instructions for smart contracts can be found in [contracts/README.md](contracts/README.md).
 
 ## 📜 Deployment
 
@@ -134,16 +127,16 @@ The project includes scripts to facilitate deployment to the Stacks network (Tes
 | `submit-work` | Public | Submits proof of work for a task in progress. |
 | `approve-work` | Public | Approves submitted work and releases payment to worker. |
 
+See [Frontend Documentation](frontend/README.md) for UI components and usage.
+
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1.  Fork the repository.
-2.  Create a new branch (`git checkout -b feature/amazing-feature`).
-3.  Commit your changes (`git commit -m 'Add some amazing feature'`).
-4.  Push to the branch (`git push origin feature/amazing-feature`).
-5.  Open a Pull Request.
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📄 License
 
 This project is licensed under the MIT License.
+
+## 📋 Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for recent updates.
