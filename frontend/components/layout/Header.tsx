@@ -1,10 +1,10 @@
 'use client';
 
-import { useStacksWallet } from '../lib/stacks-wallet';
+import { useStacksWallet } from '../../lib/stacks-wallet';
 import { Loader2, Wallet, LogOut, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from './ui/Button';
-import { Badge } from './ui/Badge';
+import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
 
 export function Header() {
     const { isConnected, address, connectWallet, disconnectWallet, isLoading } = useStacksWallet();

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Shield, Zap, Coins } from "lucide-react";
+import { Button } from "../components/ui/Button";
 
 export default function Home() {
   return (
@@ -15,17 +16,15 @@ export default function Home() {
             Decentralized task marketplace secured by Bitcoin. Post tasks, get work done, and earn crypto instantly.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
-            <Link
-              href="/marketplace"
-              className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition-colors"
-            >
-              Explore Marketplace <ArrowRight className="ml-2 h-5 w-5" />
+            <Link href="/marketplace">
+              <Button size="lg" className="text-lg px-8 py-6 rounded-full">
+                Explore Marketplace <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
             </Link>
-            <Link
-              href="/create"
-              className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium text-gray-300 border border-gray-700 rounded-full hover:bg-gray-800 transition-colors"
-            >
-              Post a Task
+            <Link href="/create">
+              <Button variant="outline" size="lg" className="text-lg px-8 py-6 rounded-full border-gray-700 hover:bg-gray-800">
+                Post a Task
+              </Button>
             </Link>
           </div>
         </div>
@@ -104,11 +103,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="py-12 border-t border-gray-800 text-center text-gray-500">
-        <p>© {new Date().getFullYear()} BitTask. Built on Stacks.</p>
-      </footer>
     </div>
   );
 }

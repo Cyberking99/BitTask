@@ -1,7 +1,8 @@
 import { openContractCall } from '@stacks/connect';
 import { UserSession } from '@stacks/auth';
 import { STACKS_MAINNET, STACKS_TESTNET } from '@stacks/network';
-import { uintCV, stringAsciiCV, createSTXPostCondition, FungibleConditionCode } from '@stacks/transactions';
+import { uintCV, stringAsciiCV, FungibleConditionCode } from '@stacks/transactions';
+import { createSTXPostCondition } from '@stacks/transactions/dist/pc';
 
 const CONTRACT_ADDRESS = 'SP34HE2KF7SPKB8BD5GY39SG7M207FZPRXJS4NMY9';
 const CONTRACT_NAME = 'bittask';
@@ -28,7 +29,7 @@ export async function createTask(
   try {
     // Convert STX to micro-STX. Use Math.round to handle potential floating point inaccuracies.
     const amountMicroSTX = Math.round(amount * STX_TO_MICROSTX);
-    
+
     // Create post-condition to ensure only the specified amount is transferred
     const postConditions = [
       createSTXPostCondition(
@@ -50,7 +51,7 @@ export async function createTask(
       ],
       network,
       postConditions,
-      userSession,
+      userSession: userSession as any,
       onFinish: (data) => {
         console.log('Task created:', data);
         const txId = data?.txId || data?.txid || data?.response?.txid || data?.stacksTransaction?.txid();

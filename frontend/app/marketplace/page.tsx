@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { Task, fetchTasks } from '../../lib/contracts';
-import { TaskCard } from '../../components/TaskCard';
+import { TaskCard } from '../../components/ui/TaskCard';
+import { Button } from '../../components/ui/Button';
+import { Badge } from '../../components/ui/Badge';
 import { isTaskExpired } from '../../lib/taskUtils';
 import { Loader2, Search, X } from 'lucide-react';
 
@@ -104,17 +106,15 @@ export default function MarketplacePage() {
                     {/* Status Filter */}
                     <div className="flex flex-wrap gap-2">
                         {statusOptions.map((option) => (
-                            <button
+                            <Button
                                 key={option.value}
                                 onClick={() => handleStatusChange(option.value)}
-                                className={`px-4 py-2 rounded-full font-medium transition-colors ${
-                                    statusFilter === option.value
-                                        ? 'bg-indigo-600 text-white'
-                                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                                }`}
+                                variant={statusFilter === option.value ? 'primary' : 'outline'}
+                                size="sm"
+                                className="rounded-full"
                             >
                                 {option.label}
-                            </button>
+                            </Button>
                         ))}
                     </div>
                 </div>
@@ -152,37 +152,37 @@ export default function MarketplacePage() {
                         {/* Pagination */}
                         {totalPages > 1 && (
                             <div className="flex justify-center items-center gap-2 mt-8">
-                                <button
+                                <Button
                                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                                     disabled={currentPage === 1}
-                                    className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    variant="outline"
+                                    size="sm"
                                 >
                                     Previous
-                                </button>
+                                </Button>
 
                                 <div className="flex gap-1">
                                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                        <button
+                                        <Button
                                             key={page}
                                             onClick={() => setCurrentPage(page)}
-                                            className={`px-3 py-2 rounded-lg font-medium transition-colors ${
-                                                currentPage === page
-                                                    ? 'bg-indigo-600 text-white'
-                                                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                                            }`}
+                                            variant={currentPage === page ? 'primary' : 'outline'}
+                                            size="sm"
+                                            className="w-8 h-8 p-0"
                                         >
                                             {page}
-                                        </button>
+                                        </Button>
                                     ))}
                                 </div>
 
-                                <button
+                                <Button
                                     onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                                     disabled={currentPage === totalPages}
-                                    className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    variant="outline"
+                                    size="sm"
                                 >
                                     Next
-                                </button>
+                                </Button>
                             </div>
                         )}
                     </>
