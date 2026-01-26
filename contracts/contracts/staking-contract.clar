@@ -12,3 +12,7 @@
 
 ;; Minimum stake amount (1 STX = 1,000,000 micro-STX)
 (define-constant minimum-stake u1000000)
+;; Data Variables
+(define-data-var total-staked uint u0)
+(define-data-var reward-pool uint u0)
+(define-data-var annual-reward-rate uint u1000) ;; 10% = 1000 basis points
