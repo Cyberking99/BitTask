@@ -92,3 +92,55 @@
     (ok true)
   )
 )
+(define-public (add-to-stake (additional-amount uint))
+  (let
+    (
+      (sender tx-sender)
+      (stake-info (unwrap! (map-get? stakes sender) err-no-stake))
+    )
+    (asserts! (> additional-amount u0) err-not-enough-balance)
+    
+    ;; Claim any pending rewards first
+    (try! (claim-rewards))
+    
+    ;; Transfer additional STX from user to contract
+    (try! (stx-transfer? additional-amount sender (as-contract tx-sender)))
+    
+    ;; Update the stake
+    (map-set stakes sender {
+      amount: (+ (get amount stake-info) additional-amount),
+      stake-block: (get stake-block stake-info),
+      last-claim-block: block-height
+    })
+    
+    ;; Update total staked
+    (var-set total-staked (+ (var-get total-staked) additional-amount))
+    
+    (ok true)
+  )
+)
+
+(define-public (claim-rewards)
+  (let
+    (
+      (sender tx-sender)
+      (stake-info (unwrap! (map-get? stakes sender) err-no-stake))
+      (pending-rewards (unwrap! (calculate-pending-rewards sender) err-no-stake))
+    )
+    (asserts! (> pending-rewards u0) (ok u0))
+    (asserts! (>= (var-get reward-pool) pending-rewards) err-reward-pool-empty)
+    
+    ;; Transfer rewards from contract to user
+    (try! (as-contract (stx-transfer? pending-rewards tx-sender sender)))
+    
+    ;; Update reward pool
+    (var-set reward-pool (- (var-get reward-pool) pending-rewards))
+    
+    ;; Update last claim block
+    (map-set stakes sender (merge stake-info {
+      last-claim-block: block-height
+    }))
+    
+    (ok pending-rewards)
+  )
+)
