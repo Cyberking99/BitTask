@@ -65,3 +65,30 @@
     (ok u0)
   )
 )
+;; Public functions
+
+(define-public (stake (amount uint))
+  (let
+    (
+      (sender tx-sender)
+      (existing-stake (map-get? stakes sender))
+    )
+    (asserts! (>= amount minimum-stake) err-minimum-stake)
+    (asserts! (is-none existing-stake) err-already-staked)
+    
+    ;; Transfer STX from user to contract
+    (try! (stx-transfer? amount sender (as-contract tx-sender)))
+    
+    ;; Record the stake
+    (map-set stakes sender {
+      amount: amount,
+      stake-block: block-height,
+      last-claim-block: block-height
+    })
+    
+    ;; Update total staked
+    (var-set total-staked (+ (var-get total-staked) amount))
+    
+    (ok true)
+  )
+)
