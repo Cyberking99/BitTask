@@ -144,3 +144,25 @@
     (ok pending-rewards)
   )
 )
+(define-public (unstake)
+  (let
+    (
+      (sender tx-sender)
+      (stake-info (unwrap! (map-get? stakes sender) err-no-stake))
+      (stake-amount (get amount stake-info))
+    )
+    ;; Claim any pending rewards first
+    (try! (claim-rewards))
+    
+    ;; Transfer staked STX back to user
+    (try! (as-contract (stx-transfer? stake-amount tx-sender sender)))
+    
+    ;; Remove the stake
+    (map-delete stakes sender)
+    
+    ;; Update total staked
+    (var-set total-staked (- (var-get total-staked) stake-amount))
+    
+    (ok stake-amount)
+  )
+)
