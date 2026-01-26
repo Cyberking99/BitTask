@@ -16,3 +16,17 @@
 (define-data-var total-staked uint u0)
 (define-data-var reward-pool uint u0)
 (define-data-var annual-reward-rate uint u1000) ;; 10% = 1000 basis points
+;; Data Maps
+(define-map stakes
+  principal
+  {
+    amount: uint,
+    stake-block: uint,
+    last-claim-block: uint
+  }
+)
+
+(define-map user-rewards
+  principal
+  uint
+)
