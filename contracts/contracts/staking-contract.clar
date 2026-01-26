@@ -30,3 +30,20 @@
   principal
   uint
 )
+;; Read-only functions
+
+(define-read-only (get-stake (user principal))
+  (map-get? stakes user)
+)
+
+(define-read-only (get-total-staked)
+  (var-get total-staked)
+)
+
+(define-read-only (get-reward-pool)
+  (var-get reward-pool)
+)
+
+(define-read-only (get-annual-reward-rate)
+  (var-get annual-reward-rate)
+)
