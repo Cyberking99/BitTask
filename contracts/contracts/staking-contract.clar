@@ -47,3 +47,21 @@
 (define-read-only (get-annual-reward-rate)
   (var-get annual-reward-rate)
 )
+(define-read-only (calculate-pending-rewards (user principal))
+  (match (map-get? stakes user)
+    stake-info
+      (let
+        (
+          (blocks-staked (- block-height (get last-claim-block stake-info)))
+          (stake-amount (get amount stake-info))
+          ;; Approximate blocks per year on Stacks (assuming ~10 min per block)
+          (blocks-per-year u52560)
+          ;; Calculate rewards: (amount * rate * blocks) / (10000 * blocks-per-year)
+          (rewards (/ (* (* stake-amount (var-get annual-reward-rate)) blocks-staked) 
+                     (* u10000 blocks-per-year)))
+        )
+        (ok rewards)
+      )
+    (ok u0)
+  )
+)
