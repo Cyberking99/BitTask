@@ -166,3 +166,26 @@
     (ok stake-amount)
   )
 )
+;; Owner-only functions
+
+(define-public (fund-reward-pool (amount uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    
+    ;; Transfer STX from owner to contract
+    (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
+    
+    ;; Update reward pool
+    (var-set reward-pool (+ (var-get reward-pool) amount))
+    
+    (ok true)
+  )
+)
+
+(define-public (set-reward-rate (new-rate uint))
+  (begin
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (var-set annual-reward-rate new-rate)
+    (ok true)
+  )
+)
