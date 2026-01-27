@@ -50,6 +50,10 @@
 (define-constant ERR-INSUFFICIENT-ESCROW (err u403)) ;; Insufficient escrow for milestone
 (define-constant ERR-NO-MILESTONES (err u404)) ;; Task has no milestones
 
+;; Task management error constants
+(define-constant ERR-TASK-NOT-MODIFIABLE (err u500)) ;; Task cannot be modified
+(define-constant ERR-INVALID-UPDATE (err u501)) ;; Invalid update parameters
+
 ;; Validation constants
 (define-constant MIN-TITLE-LENGTH u5)
 (define-constant MAX-TITLE-LENGTH u100)
@@ -1437,6 +1441,178 @@
     })))
     (match task-opt
         task (is-eq (get category task) target-category)
+        false
+    )
+)
+
+;; @desc Update task details (only for open tasks)
+;; @param task-id uint - Task ID to update
+;; @param new-title (optional (string-ascii 100)) - New title
+;; @param new-description (optional (string-ascii 500)) - New description
+;; @param new-deadline (optional uint) - New deadline
+(define-public (update-task
+        (task-id uint)
+        (new-title (optional (string-ascii 100)))
+        (new-description (optional (string-ascii 500)))
+        (new-deadline (optional uint))
+    )
+    (let ((task (unwrap! (map-get? Tasks task-id) ERR-INVALID-ID)))
+        ;; Check that sender is the creator
+        (asserts! (is-eq tx-sender (get creator task)) ERR-NOT-CREATOR)
+        
+        ;; Check that task is open (can only modify open tasks)
+        (asserts! (is-eq (get status task) "open") ERR-TASK-NOT-MODIFIABLE)
+        
+        ;; Validate new parameters if provided
+        (match new-title
+            title (begin
+                (asserts! (>= (len title) MIN-TITLE-LENGTH) ERR-TITLE-TOO-SHORT)
+                (asserts! (<= (len title) MAX-TITLE-LENGTH) ERR-TITLE-TOO-LONG)
+            )
+            true
+        )
+        
+        (match new-description
+            desc (begin
+                (asserts! (>= (len desc) MIN-DESCRIPTION-LENGTH) ERR-DESCRIPTION-TOO-SHORT)
+                (asserts! (<= (len desc) MAX-DESCRIPTION-LENGTH) ERR-DESCRIPTION-TOO-LONG)
+            )
+            true
+        )
+        
+        (match new-deadline
+            deadline (asserts! (>= deadline (+ stacks-block-height MIN-DEADLINE-BLOCKS)) ERR-DEADLINE-TOO-SOON)
+            true
+        )
+        
+        ;; Update task with new values
+        (map-set Tasks task-id
+            (merge task {
+                title: (default-to (get title task) new-title),
+                description: (default-to (get description task) new-description),
+                deadline: (default-to (get deadline task) new-deadline)
+            })
+        )
+        
+        ;; Emit event
+        (print {
+            event: "task-updated",
+            id: task-id,
+            creator: tx-sender,
+            updated-fields: {
+                title: (is-some new-title),
+                description: (is-some new-description),
+                deadline: (is-some new-deadline)
+            }
+        })
+        
+        (ok true)
+    )
+)
+
+;; @desc Clean up expired open tasks
+;; @param task-id uint - Task ID to clean up
+(define-public (cleanup-expired-task (task-id uint))
+    (let ((task (unwrap! (map-get? Tasks task-id) ERR-INVALID-ID)))
+        ;; Check task is open and expired
+        (asserts! (is-eq (get status task) "open") ERR-NOT-OPEN)
+        (asserts! (<= (get deadline task) stacks-block-height) ERR-PAST-DEADLINE)
+        
+        ;; Update task status to completed (expired)
+        (map-set Tasks task-id
+            (merge task {
+                status: "completed"
+            })
+        )
+        
+        ;; Refund STX from contract back to creator
+        (try! (as-contract (stx-transfer? (get amount task) tx-sender (get creator task))))
+        
+        ;; Emit event
+        (print {
+            event: "task-expired-cleanup",
+            id: task-id,
+            creator: (get creator task),
+            amount: (get amount task),
+            expired-at: stacks-block-height
+        })
+        
+        (ok true)
+    )
+)
+
+;; @desc Batch cleanup expired tasks
+;; @param task-ids (list 50 uint) - List of task IDs to check and cleanup
+(define-public (batch-cleanup-expired (task-ids (list 50 uint)))
+    (begin
+        (map cleanup-single-expired task-ids)
+        (ok true)
+    )
+)
+
+;; @desc Helper function for batch cleanup
+(define-private (cleanup-single-expired (task-id uint))
+    (match (map-get? Tasks task-id)
+        task (if (and 
+                (is-eq (get status task) "open")
+                (<= (get deadline task) stacks-block-height)
+            )
+            (begin
+                (map-set Tasks task-id
+                    (merge task {
+                        status: "completed"
+                    })
+                )
+                (as-contract (stx-transfer? (get amount task) tx-sender (get creator task)))
+                (print {
+                    event: "task-expired-cleanup",
+                    id: task-id,
+                    creator: (get creator task),
+                    amount: (get amount task),
+                    expired-at: stacks-block-height
+                })
+                true
+            )
+            false
+        )
+        false
+    )
+)
+
+;; @desc Get expired tasks that need cleanup
+;; @param start-id uint - Starting task ID
+;; @param limit uint - Maximum tasks to check
+(define-read-only (get-expired-tasks (start-id uint) (limit uint))
+    (let (
+        (tasks (get-tasks-paginated start-id limit))
+        (current-block stacks-block-height)
+    )
+        (filter (check-task-expired current-block) tasks)
+    )
+)
+
+;; @desc Helper to check if task is expired
+(define-private (check-task-expired (current-block uint) (task-opt (optional {
+        title: (string-ascii 100),
+        description: (string-ascii 500),
+        creator: principal,
+        worker: (optional principal),
+        amount: uint,
+        deadline: uint,
+        status: (string-ascii 20),
+        submission: (optional (string-ascii 500)),
+        created-at: uint,
+        category: (string-ascii 30),
+        dispute-id: (optional uint),
+        rating: (optional uint),
+        milestone-count: uint,
+        escrow-remaining: uint
+    })))
+    (match task-opt
+        task (and 
+            (is-eq (get status task) "open")
+            (<= (get deadline task) current-block)
+        )
         false
     )
 )
