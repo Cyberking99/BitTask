@@ -43,6 +43,13 @@
 (define-constant ERR-USER-NOT-FOUND (err u300)) ;; User reputation not found
 (define-constant ERR-INVALID-RATING (err u301)) ;; Rating must be between 1-5
 
+;; Milestone error constants
+(define-constant ERR-INVALID-MILESTONE (err u400)) ;; Milestone not found
+(define-constant ERR-MILESTONE-NOT-NEXT (err u401)) ;; Milestone not next in sequence
+(define-constant ERR-MILESTONE-ALREADY-COMPLETED (err u402)) ;; Milestone already completed
+(define-constant ERR-INSUFFICIENT-ESCROW (err u403)) ;; Insufficient escrow for milestone
+(define-constant ERR-NO-MILESTONES (err u404)) ;; Task has no milestones
+
 ;; Validation constants
 (define-constant MIN-TITLE-LENGTH u5)
 (define-constant MAX-TITLE-LENGTH u100)
@@ -113,6 +120,19 @@
     }
 )
 
+;; Milestone tracking for multi-milestone tasks
+(define-map TaskMilestones
+    {task-id: uint, milestone-id: uint}
+    {
+        description: (string-ascii 200),
+        amount: uint,
+        deadline: uint,
+        status: (string-ascii 20), ;; "pending", "completed", "paid"
+        submission: (optional (string-ascii 256)),
+        completed-at: (optional uint)
+    }
+)
+
 ;; Main storage for task details
 (define-map Tasks
     uint ;; Task ID
@@ -129,6 +149,8 @@
         category: (string-ascii 30),         ; New field for categorization
         dispute-id: (optional uint),         ; New field for dispute tracking
         rating: (optional uint),             ; New field for task rating (1-5 stars)
+        milestone-count: uint,               ; Number of milestones (0 for regular tasks)
+        escrow-remaining: uint,              ; Remaining escrow balance for milestones
     }
 )
 
@@ -277,6 +299,8 @@
             category: category,
             dispute-id: none,
             rating: none,
+            milestone-count: u0,
+            escrow-remaining: amount,
         })
 
         ;; Update category statistics
@@ -296,6 +320,266 @@
         })
 
         (ok task-id)
+    )
+)
+
+;; @desc Create a multi-milestone task
+;; @param title (string-ascii 100) - Task title
+;; @param description (string-ascii 500) - Task description
+;; @param category (string-ascii 30) - Task category
+;; @param milestones (list 10 {description: (string-ascii 200), amount: uint, deadline: uint}) - Milestone definitions
+(define-public (create-milestone-task
+        (title (string-ascii 100))
+        (description (string-ascii 500))
+        (category (string-ascii 30))
+        (milestones (list 10 {description: (string-ascii 200), amount: uint, deadline: uint}))
+    )
+    (let (
+        (task-id (+ (var-get task-nonce) u1))
+        (total-amount (fold + (map get-milestone-amount milestones) u0))
+        (milestone-count (len milestones))
+    )
+        ;; Initialize categories on first use
+        (try! (initialize-categories))
+        
+        ;; Validate basic parameters (excluding amount and deadline as they're in milestones)
+        (asserts! (>= (len title) MIN-TITLE-LENGTH) ERR-TITLE-TOO-SHORT)
+        (asserts! (<= (len title) MAX-TITLE-LENGTH) ERR-TITLE-TOO-LONG)
+        (asserts! (>= (len description) MIN-DESCRIPTION-LENGTH) ERR-DESCRIPTION-TOO-SHORT)
+        (asserts! (<= (len description) MAX-DESCRIPTION-LENGTH) ERR-DESCRIPTION-TOO-LONG)
+        (try! (validate-category category))
+        
+        ;; Validate milestone count
+        (asserts! (> milestone-count u0) ERR-NO-MILESTONES)
+        (asserts! (>= total-amount MIN-AMOUNT) ERR-AMOUNT-TOO-LOW)
+        (asserts! (<= total-amount MAX-AMOUNT) ERR-AMOUNT-TOO-HIGH)
+
+        ;; Transfer total STX from creator to contract
+        (try! (stx-transfer? total-amount tx-sender (as-contract tx-sender)))
+
+        ;; Store task data
+        (map-set Tasks task-id {
+            title: title,
+            description: description,
+            creator: tx-sender,
+            worker: none,
+            amount: total-amount,
+            deadline: (get deadline (unwrap-panic (element-at milestones (- milestone-count u1)))), ;; Last milestone deadline
+            status: "open",
+            submission: none,
+            created-at: stacks-block-height,
+            category: category,
+            dispute-id: none,
+            rating: none,
+            milestone-count: milestone-count,
+            escrow-remaining: total-amount,
+        })
+
+        ;; Create milestone records
+        (try! (create-milestone-records task-id milestones))
+
+        ;; Update category statistics
+        (try! (increment-category-count category))
+
+        ;; Increment nonce
+        (var-set task-nonce task-id)
+
+        ;; Emit event
+        (print {
+            event: "milestone-task-created",
+            id: task-id,
+            creator: tx-sender,
+            total-amount: total-amount,
+            milestone-count: milestone-count,
+            category: category,
+        })
+
+        (ok task-id)
+    )
+)
+
+;; @desc Helper function to get milestone amount
+(define-private (get-milestone-amount (milestone {description: (string-ascii 200), amount: uint, deadline: uint}))
+    (get amount milestone)
+)
+
+;; @desc Create milestone records for a task
+;; @param task-id uint - Task ID
+;; @param milestones (list 10 {description: (string-ascii 200), amount: uint, deadline: uint}) - Milestone definitions
+(define-private (create-milestone-records 
+        (task-id uint)
+        (milestones (list 10 {description: (string-ascii 200), amount: uint, deadline: uint}))
+    )
+    (let ((milestone-ids (list u0 u1 u2 u3 u4 u5 u6 u7 u8 u9)))
+        (fold create-single-milestone 
+            (zip milestone-ids milestones)
+            {task-id: task-id, success: true}
+        )
+        (ok true)
+    )
+)
+
+;; @desc Helper function to create a single milestone
+(define-private (create-single-milestone 
+        (data {milestone-id: uint, milestone: {description: (string-ascii 200), amount: uint, deadline: uint}})
+        (acc {task-id: uint, success: bool})
+    )
+    (if (get success acc)
+        (begin
+            (map-set TaskMilestones 
+                {task-id: (get task-id acc), milestone-id: (get milestone-id data)}
+                {
+                    description: (get description (get milestone data)),
+                    amount: (get amount (get milestone data)),
+                    deadline: (get deadline (get milestone data)),
+                    status: "pending",
+                    submission: none,
+                    completed-at: none
+                }
+            )
+            acc
+        )
+        acc
+    )
+)
+
+;; @desc Complete a milestone
+;; @param task-id uint - Task ID
+;; @param milestone-id uint - Milestone ID
+;; @param submission (string-ascii 256) - Milestone submission
+(define-public (complete-milestone
+        (task-id uint)
+        (milestone-id uint)
+        (submission (string-ascii 256))
+    )
+    (let (
+        (task (unwrap! (map-get? Tasks task-id) ERR-INVALID-ID))
+        (milestone (unwrap! (map-get? TaskMilestones {task-id: task-id, milestone-id: milestone-id}) ERR-INVALID-MILESTONE))
+    )
+        ;; Check sender is the worker
+        (asserts! (is-eq (some tx-sender) (get worker task)) ERR-NOT-WORKER)
+        
+        ;; Check task is in progress
+        (asserts! (is-eq (get status task) "in-progress") ERR-NOT-IN-PROGRESS)
+        
+        ;; Check milestone is pending
+        (asserts! (is-eq (get status milestone) "pending") ERR-MILESTONE-ALREADY-COMPLETED)
+        
+        ;; Check this is the next milestone in sequence
+        (asserts! (is-eq milestone-id (get-next-milestone-id task-id)) ERR-MILESTONE-NOT-NEXT)
+        
+        ;; Update milestone status
+        (map-set TaskMilestones {task-id: task-id, milestone-id: milestone-id}
+            (merge milestone {
+                status: "completed",
+                submission: (some submission),
+                completed-at: (some stacks-block-height)
+            })
+        )
+        
+        ;; Emit event
+        (print {
+            event: "milestone-completed",
+            task-id: task-id,
+            milestone-id: milestone-id,
+            worker: tx-sender,
+            submission: submission
+        })
+        
+        (ok true)
+    )
+)
+
+;; @desc Release payment for a completed milestone
+;; @param task-id uint - Task ID
+;; @param milestone-id uint - Milestone ID
+(define-public (release-milestone-payment
+        (task-id uint)
+        (milestone-id uint)
+    )
+    (let (
+        (task (unwrap! (map-get? Tasks task-id) ERR-INVALID-ID))
+        (milestone (unwrap! (map-get? TaskMilestones {task-id: task-id, milestone-id: milestone-id}) ERR-INVALID-MILESTONE))
+    )
+        ;; Check sender is the creator
+        (asserts! (is-eq tx-sender (get creator task)) ERR-NOT-CREATOR)
+        
+        ;; Check milestone is completed
+        (asserts! (is-eq (get status milestone) "completed") ERR-NOT-SUBMITTED)
+        
+        ;; Check sufficient escrow
+        (asserts! (>= (get escrow-remaining task) (get amount milestone)) ERR-INSUFFICIENT-ESCROW)
+        
+        (let ((worker-principal (unwrap! (get worker task) ERR-NOT-WORKER)))
+            ;; Update milestone status
+            (map-set TaskMilestones {task-id: task-id, milestone-id: milestone-id}
+                (merge milestone {
+                    status: "paid"
+                })
+            )
+            
+            ;; Update task escrow balance
+            (map-set Tasks task-id
+                (merge task {
+                    escrow-remaining: (- (get escrow-remaining task) (get amount milestone))
+                })
+            )
+            
+            ;; Transfer payment to worker
+            (try! (as-contract (stx-transfer? (get amount milestone) tx-sender worker-principal)))
+            
+            ;; Check if all milestones are completed
+            (let ((all-completed (is-eq (+ milestone-id u1) (get milestone-count task))))
+                (if all-completed
+                    (map-set Tasks task-id
+                        (merge task {
+                            status: "completed",
+                            escrow-remaining: (- (get escrow-remaining task) (get amount milestone))
+                        })
+                    )
+                    true
+                )
+            )
+            
+            ;; Emit event
+            (print {
+                event: "milestone-payment-released",
+                task-id: task-id,
+                milestone-id: milestone-id,
+                worker: worker-principal,
+                amount: (get amount milestone)
+            })
+            
+            (ok true)
+        )
+    )
+)
+
+;; @desc Get next milestone ID that should be completed
+;; @param task-id uint - Task ID
+(define-private (get-next-milestone-id (task-id uint))
+    (let ((task (unwrap-panic (map-get? Tasks task-id))))
+        (fold find-next-milestone 
+            (list u0 u1 u2 u3 u4 u5 u6 u7 u8 u9)
+            {task-id: task-id, next-id: u0, found: false}
+        )
+    )
+)
+
+;; @desc Helper to find next milestone
+(define-private (find-next-milestone 
+        (milestone-id uint)
+        (acc {task-id: uint, next-id: uint, found: bool})
+    )
+    (if (get found acc)
+        acc
+        (match (map-get? TaskMilestones {task-id: (get task-id acc), milestone-id: milestone-id})
+            milestone (if (is-eq (get status milestone) "pending")
+                {task-id: (get task-id acc), next-id: milestone-id, found: true}
+                acc
+            )
+            acc
+        )
     )
 )
 
@@ -909,4 +1193,27 @@
         )
         u0 ;; No reputation data
     )
+)
+
+;; @desc Get milestone information
+;; @param task-id uint - Task ID
+;; @param milestone-id uint - Milestone ID
+(define-read-only (get-milestone (task-id uint) (milestone-id uint))
+    (map-get? TaskMilestones {task-id: task-id, milestone-id: milestone-id})
+)
+
+;; @desc Get all milestones for a task
+;; @param task-id uint - Task ID
+(define-read-only (get-task-milestones (task-id uint))
+    (let ((task (unwrap! (map-get? Tasks task-id) (err "Task not found"))))
+        (if (> (get milestone-count task) u0)
+            (ok (map (get-milestone-for-task task-id) (list u0 u1 u2 u3 u4 u5 u6 u7 u8 u9)))
+            (err "Task has no milestones")
+        )
+    )
+)
+
+;; @desc Helper to get milestone for specific task
+(define-private (get-milestone-for-task (task-id uint) (milestone-id uint))
+    (map-get? TaskMilestones {task-id: task-id, milestone-id: milestone-id})
 )
