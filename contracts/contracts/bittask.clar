@@ -1750,3 +1750,70 @@
         })
     )
 )
+
+;; @desc Rate a completed task (can be called by both creator and worker)
+;; @param task-id uint - Task ID to rate
+;; @param rating uint - Rating (1-5 stars)
+;; @param review (optional (string-ascii 256)) - Optional review text
+(define-public (rate-completed-task
+        (task-id uint)
+        (rating uint)
+        (review (optional (string-ascii 256)))
+    )
+    (let ((task (unwrap! (map-get? Tasks task-id) ERR-INVALID-ID)))
+        ;; Check task is completed
+        (asserts! (is-eq (get status task) "completed") ERR-ALREADY-COMPLETED)
+        
+        ;; Check caller is creator or worker
+        (asserts! (or 
+            (is-eq tx-sender (get creator task))
+            (is-eq (some tx-sender) (get worker task))
+        ) ERR-NOT-DISPUTE-PARTICIPANT)
+        
+        ;; Validate rating
+        (asserts! (and (>= rating u1) (<= rating u5)) ERR-INVALID-RATING)
+        
+        ;; Update task rating if not already set or if this is a mutual rating
+        (if (is-none (get rating task))
+            (map-set Tasks task-id
+                (merge task {
+                    rating: (some rating)
+                })
+            )
+            true ;; Rating already exists, could implement mutual rating system here
+        )
+        
+        ;; Emit event
+        (print {
+            event: "task-rated",
+            task-id: task-id,
+            rater: tx-sender,
+            rating: rating,
+            review: review
+        })
+        
+        (ok true)
+    )
+)
+
+;; @desc Get task rating and review information
+;; @param task-id uint - Task ID
+(define-read-only (get-task-rating (task-id uint))
+    (let ((task (unwrap! (map-get? Tasks task-id) (err "Task not found"))))
+        (ok {
+            rating: (get rating task),
+            status: (get status task),
+            creator: (get creator task),
+            worker: (get worker task)
+        })
+    )
+)
+
+;; @desc Get average rating for a user across all completed tasks
+;; @param user principal - User to get average rating for
+(define-read-only (get-user-average-rating (user principal))
+    (match (map-get? UserReputation user)
+        rep (ok (get average-rating rep))
+        (err "User not found")
+    )
+)
