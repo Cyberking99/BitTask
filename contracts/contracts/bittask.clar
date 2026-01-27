@@ -54,6 +54,10 @@
 (define-constant ERR-TASK-NOT-MODIFIABLE (err u500)) ;; Task cannot be modified
 (define-constant ERR-INVALID-UPDATE (err u501)) ;; Invalid update parameters
 
+;; Work submission error constants
+(define-constant ERR-REVISION-LIMIT_EXCEEDED (err u600)) ;; Too many revisions requested
+(define-constant ERR-INVALID-SUBMISSION_FORMAT (err u601)) ;; Invalid submission format
+
 ;; Validation constants
 (define-constant MIN-TITLE-LENGTH u5)
 (define-constant MAX-TITLE-LENGTH u100)
@@ -66,6 +70,10 @@
 ;; Dispute constants
 (define-constant DISPUTE-FEE-PERCENTAGE u5) ;; 5% of task amount as dispute fee
 (define-constant MIN-DISPUTE-FEE u50000) ;; Minimum 0.05 STX dispute fee
+
+;; Work submission constants
+(define-constant MAX-REVISIONS u3) ;; Maximum number of revisions allowed
+(define-constant REVISION-DEADLINE-EXTENSION u72) ;; 12 hours extension per revision
 
 ;; Data Variables
 (define-data-var task-nonce uint u0) ;; Global counter for task IDs
@@ -137,6 +145,18 @@
     }
 )
 
+;; Work submission tracking with revision history
+(define-map WorkSubmissions
+    {task-id: uint, submission-id: uint}
+    {
+        worker: principal,
+        submission-links: (string-ascii 500), ;; Multiple links separated by semicolons
+        submitted-at: uint,
+        revision-requested: bool,
+        revision-notes: (optional (string-ascii 256))
+    }
+)
+
 ;; Main storage for task details
 (define-map Tasks
     uint ;; Task ID
@@ -155,6 +175,8 @@
         rating: (optional uint),             ; New field for task rating (1-5 stars)
         milestone-count: uint,               ; Number of milestones (0 for regular tasks)
         escrow-remaining: uint,              ; Remaining escrow balance for milestones
+        revision-count: uint,                ; Number of revisions requested
+        submission-count: uint,              ; Number of submissions made
     }
 )
 
@@ -305,6 +327,8 @@
             rating: none,
             milestone-count: u0,
             escrow-remaining: amount,
+            revision-count: u0,
+            submission-count: u0,
         })
 
         ;; Update category statistics
@@ -377,6 +401,8 @@
             rating: none,
             milestone-count: milestone-count,
             escrow-remaining: total-amount,
+            revision-count: u0,
+            submission-count: u0,
         })
 
         ;; Create milestone records
@@ -954,34 +980,107 @@
     )
 )
 
-;; @desc Submit work for a task
+;; @desc Submit work for a task with multiple links
 ;; @param id uint - Task ID
-;; @param submission (string-ascii 500) - Link or hash of the work (extended from 256)
+;; @param submission-links (string-ascii 500) - Multiple submission links separated by semicolons
 (define-public (submit-work
         (id uint)
-        (submission (string-ascii 500))
+        (submission-links (string-ascii 500))
     )
-    (let ((task (unwrap! (map-get? Tasks id) ERR-INVALID-ID)))
+    (let (
+        (task (unwrap! (map-get? Tasks id) ERR-INVALID-ID))
+        (submission-id (get submission-count task))
+    )
         ;; Check status is in-progress
         (asserts! (is-eq (get status task) "in-progress") ERR-NOT-IN-PROGRESS)
 
         ;; Check sender is the worker
         (asserts! (is-eq (some tx-sender) (get worker task)) ERR-NOT-WORKER)
+        
+        ;; Validate submission format (basic check for non-empty)
+        (asserts! (> (len submission-links) u0) ERR-INVALID-SUBMISSION_FORMAT)
+
+        ;; Create work submission record
+        (map-set WorkSubmissions {task-id: id, submission-id: submission-id}
+            {
+                worker: tx-sender,
+                submission-links: submission-links,
+                submitted-at: stacks-block-height,
+                revision-requested: false,
+                revision-notes: none
+            }
+        )
 
         ;; Update task
         (map-set Tasks id
             (merge task {
                 status: "submitted",
-                submission: (some submission),
+                submission: (some submission-links),
+                submission-count: (+ submission-id u1)
             })
         )
 
         ;; Emit event
         (print {
-            event: "submitted",
+            event: "work-submitted",
             id: id,
             worker: tx-sender,
-            submission: submission,
+            submission-id: submission-id,
+            submission-links: submission-links,
+            submitted-at: stacks-block-height
+        })
+
+        (ok true)
+    )
+)
+
+;; @desc Request revision for submitted work
+;; @param task-id uint - Task ID
+;; @param revision-notes (string-ascii 256) - Notes for revision
+(define-public (request-revision
+        (task-id uint)
+        (revision-notes (string-ascii 256))
+    )
+    (let (
+        (task (unwrap! (map-get? Tasks task-id) ERR-INVALID-ID))
+        (current-submission-id (- (get submission-count task) u1))
+    )
+        ;; Check that sender is the creator
+        (asserts! (is-eq tx-sender (get creator task)) ERR-NOT-CREATOR)
+
+        ;; Check that status is submitted
+        (asserts! (is-eq (get status task) "submitted") ERR-NOT-SUBMITTED)
+        
+        ;; Check revision limit
+        (asserts! (< (get revision-count task) MAX-REVISIONS) ERR-REVISION-LIMIT_EXCEEDED)
+
+        ;; Update work submission record
+        (let ((submission (unwrap! (map-get? WorkSubmissions {task-id: task-id, submission-id: current-submission-id}) ERR-INVALID-ID)))
+            (map-set WorkSubmissions {task-id: task-id, submission-id: current-submission-id}
+                (merge submission {
+                    revision-requested: true,
+                    revision-notes: (some revision-notes)
+                })
+            )
+        )
+
+        ;; Update task status and extend deadline
+        (map-set Tasks task-id
+            (merge task {
+                status: "in-progress",
+                revision-count: (+ (get revision-count task) u1),
+                deadline: (+ (get deadline task) REVISION-DEADLINE-EXTENSION)
+            })
+        )
+
+        ;; Emit event
+        (print {
+            event: "revision-requested",
+            task-id: task-id,
+            creator: tx-sender,
+            revision-count: (+ (get revision-count task) u1),
+            notes: revision-notes,
+            new-deadline: (+ (get deadline task) REVISION-DEADLINE-EXTENSION)
         })
 
         (ok true)
@@ -1614,5 +1713,40 @@
             (<= (get deadline task) current-block)
         )
         false
+    )
+)
+
+;; @desc Get work submission details
+;; @param task-id uint - Task ID
+;; @param submission-id uint - Submission ID
+(define-read-only (get-work-submission (task-id uint) (submission-id uint))
+    (map-get? WorkSubmissions {task-id: task-id, submission-id: submission-id})
+)
+
+;; @desc Get all submissions for a task
+;; @param task-id uint - Task ID
+(define-read-only (get-task-submissions (task-id uint))
+    (let ((task (unwrap! (map-get? Tasks task-id) (err "Task not found"))))
+        (if (> (get submission-count task) u0)
+            (ok (map (get-submission-for-task task-id) (list u0 u1 u2 u3 u4 u5 u6 u7 u8 u9)))
+            (err "Task has no submissions")
+        )
+    )
+)
+
+;; @desc Helper to get submission for specific task
+(define-private (get-submission-for-task (task-id uint) (submission-id uint))
+    (map-get? WorkSubmissions {task-id: task-id, submission-id: submission-id})
+)
+
+;; @desc Get revision history for a task
+;; @param task-id uint - Task ID
+(define-read-only (get-revision-history (task-id uint))
+    (let ((task (unwrap! (map-get? Tasks task-id) (err "Task not found"))))
+        (ok {
+            revision-count: (get revision-count task),
+            submission-count: (get submission-count task),
+            current-deadline: (get deadline task)
+        })
     )
 )
