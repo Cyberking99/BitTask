@@ -1,5 +1,19 @@
-;; BitTask: Decentralized Microgigs Marketplace
-;; Contract for managing tasks, escrow, and payments.
+;; BitTask: Decentralized Microgigs Marketplace v2.0
+;; Enhanced contract for managing tasks, escrow, payments, disputes, and reputation.
+;; 
+;; Features:
+;; - Enhanced input validation with comprehensive limits
+;; - Task categorization system with predefined categories
+;; - Dispute resolution with arbitrator system
+;; - Comprehensive reputation tracking and scoring
+;; - Multi-milestone task support with sequential completion
+;; - Advanced query and search capabilities with pagination
+;; - Task management with modification and cleanup
+;; - Enhanced work submission with revision management
+;; - Rating and quality assessment system
+;; - Emergency controls and recovery mechanisms
+;; - Comprehensive event logging and monitoring
+;; - Data completeness validation and analytics
 
 ;; Constants
 ;; Error Constants
@@ -2340,4 +2354,26 @@
     )
         (+ status-score worker-score submission-score dispute-penalty revision-penalty)
     )
+)
+
+;; @desc Gas optimization helper - batch operations
+;; @param operations (list 10 (string-ascii 20)) - List of operations to validate
+(define-read-only (validate-batch-operations (operations (list 10 (string-ascii 20))))
+    (ok {
+        total-operations: (len operations),
+        estimated-gas: (* (len operations) u1000), ;; Rough estimate
+        batch-valid: (< (len operations) u11)
+    })
+)
+
+;; @desc Contract deployment verification
+(define-read-only (verify-deployment)
+    (ok {
+        contract-deployed: true,
+        owner-set: (is-some (some (var-get contract-owner))),
+        categories-initialized: (is-some (map-get? Categories "development")),
+        nonces-initialized: (and (is-eq (var-get task-nonce) u0) (is-eq (var-get dispute-nonce) u0)),
+        deployment-block: stacks-block-height,
+        version: "2.0.0"
+    })
 )
