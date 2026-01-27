@@ -1217,3 +1217,226 @@
 (define-private (get-milestone-for-task (task-id uint) (milestone-id uint))
     (map-get? TaskMilestones {task-id: task-id, milestone-id: milestone-id})
 )
+
+;; @desc Get tasks with pagination
+;; @param start-id uint - Starting task ID
+;; @param limit uint - Maximum number of tasks to return
+(define-read-only (get-tasks-paginated (start-id uint) (limit uint))
+    (let (
+        (max-id (var-get task-nonce))
+        (end-id (if (<= (+ start-id limit) max-id) (+ start-id limit) max-id))
+        (task-ids (generate-range start-id end-id))
+    )
+        (map get-task task-ids)
+    )
+)
+
+;; @desc Generate range of task IDs
+;; @param start uint - Start ID
+;; @param end uint - End ID
+(define-private (generate-range (start uint) (end uint))
+    (if (<= start end)
+        (filter is-valid-id (list start (+ start u1) (+ start u2) (+ start u3) (+ start u4) 
+                                 (+ start u5) (+ start u6) (+ start u7) (+ start u8) (+ start u9)))
+        (list)
+    )
+)
+
+;; @desc Check if ID is valid for range
+(define-private (is-valid-id (id uint))
+    (<= id (var-get task-nonce))
+)
+
+;; @desc Filter tasks by status
+;; @param status (string-ascii 20) - Status to filter by
+;; @param task-ids (list 200 uint) - Task IDs to filter
+(define-read-only (get-tasks-by-status 
+        (status (string-ascii 20))
+        (task-ids (list 200 uint))
+    )
+    (filter (check-task-status status) (map get-task task-ids))
+)
+
+;; @desc Helper to check task status
+(define-private (check-task-status (target-status (string-ascii 20)) (task-opt (optional {
+        title: (string-ascii 100),
+        description: (string-ascii 500),
+        creator: principal,
+        worker: (optional principal),
+        amount: uint,
+        deadline: uint,
+        status: (string-ascii 20),
+        submission: (optional (string-ascii 500)),
+        created-at: uint,
+        category: (string-ascii 30),
+        dispute-id: (optional uint),
+        rating: (optional uint),
+        milestone-count: uint,
+        escrow-remaining: uint
+    })))
+    (match task-opt
+        task (is-eq (get status task) target-status)
+        false
+    )
+)
+
+;; @desc Filter tasks by amount range
+;; @param min-amount uint - Minimum amount
+;; @param max-amount uint - Maximum amount
+;; @param task-ids (list 200 uint) - Task IDs to filter
+(define-read-only (get-tasks-by-amount-range 
+        (min-amount uint)
+        (max-amount uint)
+        (task-ids (list 200 uint))
+    )
+    (filter (check-task-amount-range min-amount max-amount) (map get-task task-ids))
+)
+
+;; @desc Helper to check task amount range
+(define-private (check-task-amount-range (min-amount uint) (max-amount uint) (task-opt (optional {
+        title: (string-ascii 100),
+        description: (string-ascii 500),
+        creator: principal,
+        worker: (optional principal),
+        amount: uint,
+        deadline: uint,
+        status: (string-ascii 20),
+        submission: (optional (string-ascii 500)),
+        created-at: uint,
+        category: (string-ascii 30),
+        dispute-id: (optional uint),
+        rating: (optional uint),
+        milestone-count: uint,
+        escrow-remaining: uint
+    })))
+    (match task-opt
+        task (and (>= (get amount task) min-amount) (<= (get amount task) max-amount))
+        false
+    )
+)
+
+;; @desc Filter tasks by deadline range
+;; @param min-deadline uint - Minimum deadline
+;; @param max-deadline uint - Maximum deadline
+;; @param task-ids (list 200 uint) - Task IDs to filter
+(define-read-only (get-tasks-by-deadline-range 
+        (min-deadline uint)
+        (max-deadline uint)
+        (task-ids (list 200 uint))
+    )
+    (filter (check-task-deadline-range min-deadline max-deadline) (map get-task task-ids))
+)
+
+;; @desc Helper to check task deadline range
+(define-private (check-task-deadline-range (min-deadline uint) (max-deadline uint) (task-opt (optional {
+        title: (string-ascii 100),
+        description: (string-ascii 500),
+        creator: principal,
+        worker: (optional principal),
+        amount: uint,
+        deadline: uint,
+        status: (string-ascii 20),
+        submission: (optional (string-ascii 500)),
+        created-at: uint,
+        category: (string-ascii 30),
+        dispute-id: (optional uint),
+        rating: (optional uint),
+        milestone-count: uint,
+        escrow-remaining: uint
+    })))
+    (match task-opt
+        task (and (>= (get deadline task) min-deadline) (<= (get deadline task) max-deadline))
+        false
+    )
+)
+
+;; @desc Advanced task search with multiple filters
+;; @param filters {status: (optional (string-ascii 20)), category: (optional (string-ascii 30)), min-amount: (optional uint), max-amount: (optional uint)}
+;; @param start-id uint - Starting task ID for pagination
+;; @param limit uint - Maximum results to return
+(define-read-only (search-tasks 
+        (filters {
+            status: (optional (string-ascii 20)),
+            category: (optional (string-ascii 30)),
+            min-amount: (optional uint),
+            max-amount: (optional uint)
+        })
+        (start-id uint)
+        (limit uint)
+    )
+    (let (
+        (base-tasks (get-tasks-paginated start-id limit))
+        (filtered-tasks (apply-search-filters filters base-tasks))
+    )
+        filtered-tasks
+    )
+)
+
+;; @desc Apply search filters to task list
+(define-private (apply-search-filters 
+        (filters {
+            status: (optional (string-ascii 20)),
+            category: (optional (string-ascii 30)),
+            min-amount: (optional uint),
+            max-amount: (optional uint)
+        })
+        (tasks (list 200 (optional {
+            title: (string-ascii 100),
+            description: (string-ascii 500),
+            creator: principal,
+            worker: (optional principal),
+            amount: uint,
+            deadline: uint,
+            status: (string-ascii 20),
+            submission: (optional (string-ascii 500)),
+            created-at: uint,
+            category: (string-ascii 30),
+            dispute-id: (optional uint),
+            rating: (optional uint),
+            milestone-count: uint,
+            escrow-remaining: uint
+        })))
+    )
+    (let (
+        (status-filtered (match (get status filters)
+            status (filter (check-task-status status) tasks)
+            tasks
+        ))
+        (category-filtered (match (get category filters)
+            category (filter (check-task-category category) status-filtered)
+            status-filtered
+        ))
+        (amount-filtered (match (get min-amount filters)
+            min-amt (match (get max-amount filters)
+                max-amt (filter (check-task-amount-range min-amt max-amt) category-filtered)
+                category-filtered
+            )
+            category-filtered
+        ))
+    )
+        amount-filtered
+    )
+)
+
+;; @desc Helper to check task category
+(define-private (check-task-category (target-category (string-ascii 30)) (task-opt (optional {
+        title: (string-ascii 100),
+        description: (string-ascii 500),
+        creator: principal,
+        worker: (optional principal),
+        amount: uint,
+        deadline: uint,
+        status: (string-ascii 20),
+        submission: (optional (string-ascii 500)),
+        created-at: uint,
+        category: (string-ascii 30),
+        dispute-id: (optional uint),
+        rating: (optional uint),
+        milestone-count: uint,
+        escrow-remaining: uint
+    })))
+    (match task-opt
+        task (is-eq (get category task) target-category)
+        false
+    )
+)
