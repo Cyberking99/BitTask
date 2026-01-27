@@ -2213,3 +2213,131 @@
         (+ title-score desc-score category-score amount-score deadline-score)
     )
 )
+
+;; @desc Comprehensive error handler for debugging
+;; @param error-code uint - Error code
+(define-read-only (get-error-info (error-code uint))
+    (if (is-eq error-code u100) (ok "ERR-ZERO-AMOUNT: Amount must be greater than 0")
+    (if (is-eq error-code u101) (ok "ERR-INVALID-ID: Task ID not found")
+    (if (is-eq error-code u102) (ok "ERR-UNAUTHORIZED: Caller is not authorized")
+    (if (is-eq error-code u103) (ok "ERR-PAST-DEADLINE: Deadline has passed")
+    (if (is-eq error-code u104) (ok "ERR-EMPTY-TITLE: Title cannot be empty")
+    (if (is-eq error-code u105) (ok "ERR-EMPTY-DESCRIPTION: Description cannot be empty")
+    (if (is-eq error-code u106) (ok "ERR-CREATOR-CANNOT-ACCEPT: Creator cannot accept their own task")
+    (if (is-eq error-code u107) (ok "ERR-NOT-OPEN: Task status is not 'open'")
+    (if (is-eq error-code u108) (ok "ERR-NOT-IN-PROGRESS: Task status is not 'in-progress'")
+    (if (is-eq error-code u109) (ok "ERR-NOT-WORKER: Caller is not the assigned worker")
+    (if (is-eq error-code u110) (ok "ERR-NOT-SUBMITTED: Task has not been submitted")
+    (if (is-eq error-code u111) (ok "ERR-NOT-CREATOR: Caller is not the task creator")
+    (if (is-eq error-code u112) (ok "ERR-ALREADY-COMPLETED: Task is already completed")
+    (if (is-eq error-code u113) (ok "ERR-TITLE-TOO-SHORT: Title must be at least 5 characters")
+    (if (is-eq error-code u114) (ok "ERR-TITLE-TOO-LONG: Title must be at most 100 characters")
+    (if (is-eq error-code u115) (ok "ERR-DESCRIPTION-TOO-SHORT: Description must be at least 20 characters")
+    (if (is-eq error-code u116) (ok "ERR-DESCRIPTION-TOO-LONG: Description must be at most 500 characters")
+    (if (is-eq error-code u117) (ok "ERR-AMOUNT-TOO-LOW: Amount below minimum limit")
+    (if (is-eq error-code u118) (ok "ERR-AMOUNT-TOO-HIGH: Amount above maximum limit")
+    (if (is-eq error-code u119) (ok "ERR-DEADLINE-TOO-SOON: Deadline must be at least 24 hours in future")
+    (if (is-eq error-code u120) (ok "ERR-INVALID-CATEGORY: Category does not exist")
+    (if (is-eq error-code u121) (ok "ERR-CATEGORY-INACTIVE: Category is not active")
+        (err "Unknown error code")
+    ))))))))))))))))))))))))
+)
+
+;; @desc Validate contract state integrity
+(define-read-only (validate-contract-integrity)
+    (let (
+        (total-tasks (var-get task-nonce))
+        (total-disputes (var-get dispute-nonce))
+        (owner-set (is-some (some (var-get contract-owner))))
+    )
+        (ok {
+            tasks-created: total-tasks,
+            disputes-created: total-disputes,
+            owner-configured: owner-set,
+            contract-paused: (var-get contract-paused),
+            emergency-admin-set: (is-some (var-get emergency-admin)),
+            integrity-score: (if (and owner-set (>= total-tasks u0)) u100 u50)
+        })
+    )
+)
+
+;; @desc Get contract version and feature flags
+(define-read-only (get-contract-info)
+    (ok {
+        version: "2.0.0",
+        features: {
+            categories: true,
+            disputes: true,
+            reputation: true,
+            milestones: true,
+            revisions: true,
+            emergency-controls: true,
+            advanced-queries: true
+        },
+        limits: {
+            max-title-length: MAX-TITLE-LENGTH,
+            max-description-length: MAX-DESCRIPTION-LENGTH,
+            min-amount: MIN-AMOUNT,
+            max-amount: MAX-AMOUNT,
+            min-deadline-blocks: MIN-DEADLINE-BLOCKS,
+            max-revisions: MAX-REVISIONS
+        }
+    })
+)
+
+;; @desc Comprehensive task workflow validation
+;; @param task-id uint - Task ID to validate workflow
+(define-read-only (validate-task-workflow (task-id uint))
+    (let ((task (unwrap! (map-get? Tasks task-id) (err "Task not found"))))
+        (ok {
+            current-status: (get status task),
+            valid-transitions: (get-valid-transitions (get status task)),
+            has-worker: (is-some (get worker task)),
+            has-submissions: (> (get submission-count task) u0),
+            has-disputes: (is-some (get dispute-id task)),
+            has-milestones: (> (get milestone-count task) u0),
+            workflow-health: (calculate-workflow-health task)
+        })
+    )
+)
+
+;; @desc Get valid state transitions for current status
+(define-private (get-valid-transitions (status (string-ascii 20)))
+    (if (is-eq status "open") (list "in-progress" "disputed" "completed")
+    (if (is-eq status "in-progress") (list "submitted" "disputed" "completed")
+    (if (is-eq status "submitted") (list "completed" "disputed" "in-progress")
+    (if (is-eq status "disputed") (list "completed" "open")
+    (if (is-eq status "completed") (list)
+        (list)
+    )))))
+)
+
+;; @desc Calculate workflow health score
+(define-private (calculate-workflow-health (task {
+        title: (string-ascii 100),
+        description: (string-ascii 500),
+        creator: principal,
+        worker: (optional principal),
+        amount: uint,
+        deadline: uint,
+        status: (string-ascii 20),
+        submission: (optional (string-ascii 500)),
+        created-at: uint,
+        category: (string-ascii 30),
+        dispute-id: (optional uint),
+        rating: (optional uint),
+        milestone-count: uint,
+        escrow-remaining: uint,
+        revision-count: uint,
+        submission-count: uint
+    }))
+    (let (
+        (status-score (if (is-eq (get status task) "completed") u40 u20))
+        (worker-score (if (is-some (get worker task)) u20 u0))
+        (submission-score (if (> (get submission-count task) u0) u20 u0))
+        (dispute-penalty (if (is-some (get dispute-id task)) u-10 u0))
+        (revision-penalty (* (get revision-count task) u-5))
+    )
+        (+ status-score worker-score submission-score dispute-penalty revision-penalty)
+    )
+)
