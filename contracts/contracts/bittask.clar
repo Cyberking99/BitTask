@@ -2034,3 +2034,66 @@
 (define-read-only (get-emergency-admin)
     (var-get emergency-admin)
 )
+
+;; @desc Get contract statistics for monitoring
+(define-read-only (get-contract-stats)
+    (ok {
+        total-tasks: (var-get task-nonce),
+        total-disputes: (var-get dispute-nonce),
+        contract-paused: (var-get contract-paused),
+        contract-owner: (var-get contract-owner),
+        emergency-admin: (var-get emergency-admin),
+        current-block: stacks-block-height
+    })
+)
+
+;; @desc Get comprehensive task information for monitoring
+;; @param task-id uint - Task ID
+(define-read-only (get-task-full-info (task-id uint))
+    (let ((task (unwrap! (map-get? Tasks task-id) (err "Task not found"))))
+        (ok {
+            task: task,
+            dispute: (match (get dispute-id task)
+                dispute-id (map-get? Disputes dispute-id)
+                none
+            ),
+            recovery: (map-get? RecoveryRequests task-id),
+            submissions: (if (> (get submission-count task) u0)
+                (map (get-submission-for-task task-id) (list u0 u1 u2 u3 u4))
+                (list)
+            )
+        })
+    )
+)
+
+;; @desc Emit standardized event for external monitoring
+;; @param event-type (string-ascii 50) - Type of event
+;; @param event-data (string-ascii 500) - Event data as JSON string
+(define-private (emit-monitoring-event 
+        (event-type (string-ascii 50))
+        (event-data (string-ascii 500))
+    )
+    (print {
+        event-type: event-type,
+        timestamp: stacks-block-height,
+        data: event-data,
+        contract: "bittask-v2"
+    })
+)
+
+;; @desc Get system health status
+(define-read-only (get-system-health)
+    (let (
+        (total-tasks (var-get task-nonce))
+        (total-disputes (var-get dispute-nonce))
+        (dispute-rate (if (> total-tasks u0) (/ (* total-disputes u100) total-tasks) u0))
+    )
+        (ok {
+            total-tasks: total-tasks,
+            total-disputes: total-disputes,
+            dispute-rate-percentage: dispute-rate,
+            contract-paused: (var-get contract-paused),
+            health-status: (if (< dispute-rate u10) "healthy" "needs-attention")
+        })
+    )
+)
