@@ -48,4 +48,21 @@ describe('SIP-010 Token - Transfer Functions', () => {
     
     expect(transfer.result).toBeErr(Cl.uint(1)); // ERR-INSUFFICIENT-BALANCE
   });
+
+  it('should handle transfer with memo', () => {
+    const transferAmount = 2000;
+    const memo = "Test transfer with memo";
+    
+    const transfer = simnet.callPublicFn(
+      'sip010-token', 
+      'transfer', 
+      [Cl.uint(transferAmount), Cl.principal(deployer), Cl.principal(alice), Cl.some(Cl.bufferFromAscii(memo))], 
+      deployer
+    );
+    
+    expect(transfer.result).toBeOk(Cl.bool(true));
+    
+    const aliceBalance = simnet.callReadOnlyFn('sip010-token', 'get-balance', [Cl.principal(alice)], deployer);
+    expect(aliceBalance.result).toBeOk(Cl.uint(transferAmount));
+  });
 });
