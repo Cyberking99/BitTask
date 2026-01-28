@@ -51,3 +51,24 @@
 (define-public (get-balance (who principal))
     (ok (ft-get-balance bittoken who))
 )
+;; Transfer tokens
+(define-public (transfer (amount uint) (sender principal) (recipient principal) (memo (optional (buff 34))))
+    (begin
+        ;; Verify sender authorization
+        (asserts! (is-eq tx-sender sender) ERR-NOT-TOKEN-OWNER)
+        
+        ;; Execute transfer using fungible token primitives
+        (try! (ft-transfer? bittoken amount sender recipient))
+        
+        ;; Emit transfer event with memo
+        (print {
+            action: "transfer",
+            sender: sender,
+            recipient: recipient,
+            amount: amount,
+            memo: memo
+        })
+        
+        (ok true)
+    )
+)
