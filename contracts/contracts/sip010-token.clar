@@ -47,3 +47,7 @@
 (define-public (get-total-supply)
     (ok (ft-get-supply bittoken))
 )
+;; Get balance for a principal
+(define-public (get-balance (who principal))
+    (ok (ft-get-balance bittoken who))
+)
