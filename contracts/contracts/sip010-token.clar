@@ -28,3 +28,10 @@
 
 ;; Initialize contract with initial supply to owner
 (ft-mint? bittoken INITIAL-SUPPLY tx-sender)
+
+;; SIP-010 trait implementation
+
+;; Get token name
+(define-public (get-name)
+    (ok TOKEN-NAME)
+)
