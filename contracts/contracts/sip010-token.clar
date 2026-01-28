@@ -93,3 +93,7 @@
         (ok true)
     )
 )
+;; Get allowance between owner and spender
+(define-public (get-allowance (owner principal) (spender principal))
+    (ok (default-to u0 (map-get? allowances {owner: owner, spender: spender})))
+)
