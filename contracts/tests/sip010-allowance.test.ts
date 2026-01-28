@@ -59,4 +59,29 @@ describe('SIP-010 Token - Allowance System', () => {
     
     expect(allowance.result).toBeOk(Cl.uint(secondApproval));
   });
+
+  it('should handle multiple spenders for same owner', () => {
+    const approveAmount = 3000;
+    
+    // Approve both Alice and Bob
+    simnet.callPublicFn('sip010-token', 'approve', [Cl.principal(alice), Cl.uint(approveAmount)], deployer);
+    simnet.callPublicFn('sip010-token', 'approve', [Cl.principal(bob), Cl.uint(approveAmount)], deployer);
+    
+    const aliceAllowance = simnet.callReadOnlyFn(
+      'sip010-token', 
+      'get-allowance', 
+      [Cl.principal(deployer), Cl.principal(alice)], 
+      deployer
+    );
+    
+    const bobAllowance = simnet.callReadOnlyFn(
+      'sip010-token', 
+      'get-allowance', 
+      [Cl.principal(deployer), Cl.principal(bob)], 
+      deployer
+    );
+    
+    expect(aliceAllowance.result).toBeOk(Cl.uint(approveAmount));
+    expect(bobAllowance.result).toBeOk(Cl.uint(approveAmount));
+  });
 });
