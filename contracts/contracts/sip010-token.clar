@@ -148,3 +148,23 @@
         (ok true)
     )
 )
+;; Burn tokens from caller's balance
+(define-public (burn (amount uint))
+    (begin
+        ;; Check sufficient balance
+        (asserts! (>= (ft-get-balance bittoken tx-sender) amount) ERR-INSUFFICIENT-BALANCE)
+        
+        ;; Burn tokens from caller
+        (try! (ft-burn? bittoken amount tx-sender))
+        
+        ;; Emit burn event
+        (print {
+            action: "burn",
+            account: tx-sender,
+            amount: amount,
+            total-supply: (ft-get-supply bittoken)
+        })
+        
+        (ok true)
+    )
+)
