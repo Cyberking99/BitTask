@@ -21,6 +21,7 @@
 (define-data-var token-uri (optional (string-utf8 256)) none)
 
 ;; Data maps
+;; Allowances map for tracking spending permissions
 (define-map allowances {owner: principal, spender: principal} uint)
 
 ;; Define the fungible token
