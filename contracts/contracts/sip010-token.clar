@@ -1,5 +1,17 @@
 ;; SIP-010 Compliant BitToken (BTK) Implementation
 ;; A fully compliant SIP-010 fungible token for the BitTask platform
+;; 
+;; This contract implements all required SIP-010 functions:
+;; - get-name, get-symbol, get-decimals, get-total-supply, get-balance
+;; - transfer with memo support and proper authorization
+;; - get-token-uri for metadata (optional SIP-010 function)
+;;
+;; Additional features:
+;; - Allowance system (approve, get-allowance, transfer-from)
+;; - Minting and burning capabilities with proper authorization
+;; - Administrative functions for contract management
+;; - Comprehensive error handling and event emission
+;; - Gas-optimized using Clarity's built-in fungible token primitives
 
 ;; Import SIP-010 trait
 (impl-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
@@ -32,7 +44,9 @@
 ;; Initialize contract with initial supply to owner
 (ft-mint? bittoken INITIAL-SUPPLY tx-sender)
 
-;; SIP-010 trait implementation
+;; ============================================================================
+;; SIP-010 TRAIT IMPLEMENTATION
+;; ============================================================================
 
 ;; Get token name
 (define-public (get-name)
@@ -78,6 +92,11 @@
         (ok true)
     )
 )
+
+;; ============================================================================
+;; EXTENDED FUNCTIONALITY
+;; ============================================================================
+
 ;; Approve spender to spend tokens on behalf of owner
 (define-public (approve (spender principal) (amount uint))
     (begin
@@ -127,6 +146,11 @@
         (ok true)
     )
 )
+
+;; ============================================================================
+;; ADMINISTRATIVE FUNCTIONS
+;; ============================================================================
+
 ;; Mint new tokens (owner only)
 (define-public (mint (amount uint) (recipient principal))
     (begin
@@ -185,7 +209,6 @@
         )
     )
 )
-;; Administrative functions
 
 ;; Set new contract owner (current owner only)
 (define-public (set-contract-owner (new-owner principal))
