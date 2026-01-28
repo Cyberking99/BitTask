@@ -97,3 +97,31 @@
 (define-public (get-allowance (owner principal) (spender principal))
     (ok (default-to u0 (map-get? allowances {owner: owner, spender: spender})))
 )
+;; Transfer tokens from owner to recipient using allowance
+(define-public (transfer-from (amount uint) (owner principal) (recipient principal) (memo (optional (buff 34))))
+    (let ((allowance (default-to u0 (map-get? allowances {owner: owner, spender: tx-sender}))))
+        ;; Check sufficient allowance
+        (asserts! (>= allowance amount) ERR-INSUFFICIENT-ALLOWANCE)
+        
+        ;; Check sufficient balance
+        (asserts! (>= (ft-get-balance bittoken owner) amount) ERR-INSUFFICIENT-BALANCE)
+        
+        ;; Execute transfer
+        (try! (ft-transfer? bittoken amount owner recipient))
+        
+        ;; Update allowance
+        (map-set allowances {owner: owner, spender: tx-sender} (- allowance amount))
+        
+        ;; Emit transfer event
+        (print {
+            action: "transfer-from",
+            owner: owner,
+            spender: tx-sender,
+            recipient: recipient,
+            amount: amount,
+            memo: memo
+        })
+        
+        (ok true)
+    )
+)
