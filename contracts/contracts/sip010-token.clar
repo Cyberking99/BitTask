@@ -125,3 +125,23 @@
         (ok true)
     )
 )
+;; Mint new tokens (owner only)
+(define-public (mint (amount uint) (recipient principal))
+    (begin
+        ;; Check owner authorization
+        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-OWNER-ONLY)
+        
+        ;; Mint tokens to recipient
+        (try! (ft-mint? bittoken amount recipient))
+        
+        ;; Emit mint event
+        (print {
+            action: "mint",
+            recipient: recipient,
+            amount: amount,
+            total-supply: (ft-get-supply bittoken)
+        })
+        
+        (ok true)
+    )
+)
