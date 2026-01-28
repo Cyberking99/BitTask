@@ -35,3 +35,7 @@
 (define-public (get-name)
     (ok TOKEN-NAME)
 )
+;; Get token symbol
+(define-public (get-symbol)
+    (ok TOKEN-SYMBOL)
+)
