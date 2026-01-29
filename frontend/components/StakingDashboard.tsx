@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/Button';
-import { Input } from './ui/input';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
+import { Input } from './ui/Input';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/Card';
 import { TrendingUp, Lock, Coins, ArrowUpRight, Clock, Award } from 'lucide-react';
 import { stakeTokens, unstakeTokens, StakeInfo } from '../lib/stakingActions';
 import { useStacksWallet } from '../lib/stacks-wallet';
@@ -13,7 +13,7 @@ export default function StakingDashboard() {
     const { address, userSession, isConnected } = useStacksWallet();
     const [stakeAmount, setStakeAmount] = useState<string>('');
     const [loading, setLoading] = useState(false);
-    const [stakeInfo, setStakeInfo] = useState<StakeInfo | null>(null);
+    const [stakeInfo] = useState<StakeInfo | null>(null);
 
     const handleStake = async () => {
         if (!stakeAmount || isNaN(Number(stakeAmount)) || Number(stakeAmount) <= 0) {

@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Badge } from './ui/badge';
-import { Trophy, Medal, Star, Target, Zap, TrendingUp, Search } from 'lucide-react';
-import { Input } from './ui/input';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/Avatar';
+import { Badge } from './ui/Badge';
+import { Trophy, Medal, Target, Zap, TrendingUp, Search } from 'lucide-react';
+import { Input } from './ui/Input';
+import { Button } from './ui/Button';
 
 interface LeaderboardEntry {
     rank: number;
@@ -53,6 +54,7 @@ export default function Leaderboard() {
                         <CardHeader className="text-center pb-2">
                             <div className="mx-auto relative mb-4">
                                 <Avatar className="w-20 h-20 border-4 border-black/50 shadow-2xl">
+                                    <AvatarImage src={`https://api.dicebear.com/7.x/identicon/svg?seed=${entry.user}`} />
                                     <AvatarFallback className="text-2xl font-bold bg-white/10">{entry.user[0].toUpperCase()}</AvatarFallback>
                                 </Avatar>
                                 <div className={`absolute -bottom-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx === 0 ? 'bg-yellow-500 text-black' : idx === 1 ? 'bg-slate-300 text-black' : 'bg-amber-600'}`}>

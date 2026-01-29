@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from './ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from './ui/Card';
 import { Button } from './ui/Button';
-import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
+import { Input } from './ui/Input';
+import { Textarea } from './ui/Textarea';
 import { Settings, Info, AlertTriangle, CheckSquare, Send, ArrowLeft, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -62,7 +62,7 @@ export default function ProposalCreator() {
                                 placeholder="e.g., Expansion of BTK Utility"
                                 className="bg-black/50 border-white/10 h-12 text-lg focus:ring-indigo-500"
                                 value={formData.title}
-                                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, title: e.target.value })}
                             />
                         </div>
                         <div className="space-y-2">
@@ -97,7 +97,7 @@ export default function ProposalCreator() {
                                 placeholder="Describe your proposal in detail..."
                                 className="min-h-[200px] bg-black/50 border-white/10 focus:ring-indigo-500"
                                 value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData({ ...formData, description: e.target.value })}
                             />
                         </div>
                         <div className="space-y-2">
@@ -106,7 +106,7 @@ export default function ProposalCreator() {
                                 placeholder="https://forum.bittask.org/..."
                                 className="bg-black/50 border-white/10"
                                 value={formData.discussionLink}
-                                onChange={(e) => setFormData({ ...formData, discussionLink: e.target.value })}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({ ...formData, discussionLink: e.target.value })}
                             />
                         </div>
                     </CardContent>

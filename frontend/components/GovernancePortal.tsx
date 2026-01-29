@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from './ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from './ui/Card';
 import { Button } from './ui/Button';
-import { Badge } from './ui/badge';
+import { Badge } from './ui/Badge';
 import { Progress } from './ui/progress';
 import { Vote, Users, FileText, CheckCircle2, XCircle, Timer, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
@@ -67,19 +67,19 @@ export default function GovernancePortal() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <Card className="bg-black/40 border-purple-500/20 shadow-lg shadow-purple-500/5 backdrop-blur-md">
                     <CardHeader>
-                        <CardDescription>Total Proposals</CardTitle>
+                        <CardDescription>Total Proposals</CardDescription>
                         <CardTitle className="text-3xl font-mono">248</CardTitle>
                     </CardHeader>
                 </Card>
                 <Card className="bg-black/40 border-pink-500/20 shadow-lg shadow-pink-500/5 backdrop-blur-md">
                     <CardHeader>
-                        <CardDescription>Active Votes</CardTitle>
+                        <CardDescription>Active Votes</CardDescription>
                         <CardTitle className="text-3xl font-mono text-pink-500">3</CardTitle>
                     </CardHeader>
                 </Card>
                 <Card className="bg-black/40 border-blue-500/20 shadow-lg shadow-blue-500/5 backdrop-blur-md">
                     <CardHeader>
-                        <CardDescription>DAO Treasury</CardTitle>
+                        <CardDescription>DAO Treasury</CardDescription>
                         <CardTitle className="text-3xl font-mono">1.2M <span className="text-sm font-sans">BTK</span></CardTitle>
                     </CardHeader>
                 </Card>
