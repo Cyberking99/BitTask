@@ -86,9 +86,21 @@
                         last-activity: stacks-block-height
                     })
                 )
+                (print { event: "points-added", user: user, amount: multiplied-amount })
                 (ok multiplied-amount)
             )
         )
+    )
+)
+
+;; @desc Claim rewards (placeholder for real reward distribution)
+(define-public (claim-rewards)
+    (let ((stats (unwrap! (map-get? ReferralStats tx-sender) ERR-NOT-FOUND)))
+        (asserts! (> (get total-points stats) u0) ERR-UNAUTHORIZED)
+        ;; Reset points after claim (simplified logic)
+        (map-set ReferralStats tx-sender (merge stats { total-points: u0 }))
+        (print { event: "rewards-claimed", user: tx-sender, points: (get total-points stats) })
+        (ok true)
     )
 )
 
