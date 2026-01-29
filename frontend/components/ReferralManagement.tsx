@@ -6,7 +6,7 @@ import { registerReferrer } from '../lib/contractActions';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from './ui/Card';
-import { Alert, AlertDescription } from './ui/Alert';
+import { Alert } from './ui/Alert';
 
 /**
  * ReferralManagement Component
@@ -82,9 +82,7 @@ export function ReferralManagement() {
 
                 {message && (
                     <Alert variant={message.type === 'success' ? 'default' : 'destructive'} className="animate-in fade-in slide-in-from-top-1">
-                        <AlertDescription>
-                            {message.text}
-                        </AlertDescription>
+                        {message.text}
                     </Alert>
                 )}
             </CardContent>
