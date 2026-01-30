@@ -192,3 +192,42 @@
     (ok true)
   )
 )
+;; Approval lifecycle management
+
+;; Check if operator is approved for token
+(define-read-only (is-approved-for (token-id uint) (operator principal))
+  (let ((owner (map-get? token-owners token-id))
+        (approved (map-get? token-approvals token-id)))
+    (match owner
+      owner-principal (or 
+        (is-eq operator owner-principal)
+        (is-eq (some operator) approved))
+      false)
+  )
+)
+
+;; Transfer from approved operator
+(define-public (transfer-from (token-id uint) (sender principal) (recipient principal))
+  (let ((owner (unwrap! (map-get? token-owners token-id) ERR-NOT-FOUND)))
+    ;; Verify sender is owner
+    (asserts! (is-eq sender owner) ERR-NOT-AUTHORIZED)
+    
+    ;; Verify caller is approved
+    (asserts! (is-approved-for token-id tx-sender) ERR-NOT-AUTHORIZED)
+    
+    ;; Execute transfer
+    (transfer token-id sender recipient)
+  )
+)
+
+;; Batch approval revocation (for contract owner)
+(define-public (revoke-all-approvals (token-ids (list 100 uint)))
+  (begin
+    (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+    (ok (map revoke-approval-helper token-ids))
+  )
+)
+
+(define-private (revoke-approval-helper (token-id uint))
+  (map-delete token-approvals token-id)
+)
