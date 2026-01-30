@@ -101,3 +101,53 @@
     (ok true)
   )
 )
+;; Transfer functionality
+
+;; Transfer token (SIP-090 required function)
+(define-public (transfer (token-id uint) (sender principal) (recipient principal))
+  (let ((owner (unwrap! (map-get? token-owners token-id) ERR-NOT-FOUND)))
+    ;; Verify authorization
+    (asserts! (or 
+      (is-eq tx-sender sender)
+      (is-eq tx-sender owner)
+      (is-eq tx-sender (default-to sender (map-get? token-approvals token-id)))
+    ) ERR-NOT-AUTHORIZED)
+    
+    ;; Verify sender is current owner
+    (asserts! (is-eq sender owner) ERR-NOT-AUTHORIZED)
+    
+    ;; Update ownership
+    (map-set token-owners token-id recipient)
+    
+    ;; Update balances
+    (map-set owner-balances sender 
+      (- (default-to u0 (map-get? owner-balances sender)) u1))
+    (map-set owner-balances recipient 
+      (+ (default-to u0 (map-get? owner-balances recipient)) u1))
+    
+    ;; Clear any existing approvals
+    (map-delete token-approvals token-id)
+    
+    ;; Emit transfer event
+    (print {
+      type: "nft_transfer_event",
+      token-id: token-id,
+      sender: sender,
+      recipient: recipient
+    })
+    
+    (ok true)
+  )
+)
+
+;; Helper function for safe transfers with validation
+(define-private (transfer-helper (token-id uint) (sender principal) (recipient principal))
+  (begin
+    ;; Basic validation
+    (asserts! (not (is-eq sender recipient)) ERR-INVALID-RECIPIENT)
+    (asserts! (token-exists token-id) ERR-NOT-FOUND)
+    
+    ;; Call main transfer function
+    (transfer token-id sender recipient)
+  )
+)
