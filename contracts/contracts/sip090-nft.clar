@@ -151,3 +151,44 @@
     (transfer token-id sender recipient)
   )
 )
+;; Approval system
+
+;; Approve operator for specific token
+(define-public (approve (spender principal) (token-id uint))
+  (let ((owner (unwrap! (map-get? token-owners token-id) ERR-NOT-FOUND)))
+    (asserts! (or (is-eq tx-sender owner) (is-eq tx-sender (var-get contract-owner))) ERR-NOT-AUTHORIZED)
+    (map-set token-approvals token-id spender)
+    
+    ;; Emit approval event
+    (print {
+      type: "nft_approval_event",
+      token-id: token-id,
+      owner: owner,
+      approved: spender
+    })
+    
+    (ok true)
+  )
+)
+
+;; Get approved operator for token
+(define-read-only (get-approved (token-id uint))
+  (ok (map-get? token-approvals token-id))
+)
+
+;; Revoke approval for specific token
+(define-public (revoke-approval (token-id uint))
+  (let ((owner (unwrap! (map-get? token-owners token-id) ERR-NOT-FOUND)))
+    (asserts! (or (is-eq tx-sender owner) (is-eq tx-sender (var-get contract-owner))) ERR-NOT-AUTHORIZED)
+    (map-delete token-approvals token-id)
+    
+    ;; Emit approval revocation event
+    (print {
+      type: "nft_approval_revoked_event",
+      token-id: token-id,
+      owner: owner
+    })
+    
+    (ok true)
+  )
+)
