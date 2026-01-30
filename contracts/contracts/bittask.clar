@@ -30,6 +30,8 @@
 (define-constant ERR-NOT-SUBMITTED (err u110)) ;; Task has not been submitted
 (define-constant ERR-NOT-CREATOR (err u111)) ;; Caller is not the task creator
 (define-constant ERR-ALREADY-COMPLETED (err u112)) ;; Task is already completed
+(define-constant ERR-INVALID-MILESTONE (err u113)) ;; Milestone ID not found or invalid
+(define-constant ERR-MILESTONE-ALREADY-APPROVED (err u114)) ;; Milestone already approved
 
 ;; Enhanced validation error constants
 (define-constant ERR-TITLE-TOO-SHORT (err u113)) ;; Title must be at least 5 characters
