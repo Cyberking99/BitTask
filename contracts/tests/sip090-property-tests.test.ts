@@ -665,3 +665,74 @@ Clarinet.test({
         }
     },
 });
+// **Feature: sip090-token, Property 15: Balance accuracy**
+// **Validates: Requirements 5.3**
+Clarinet.test({
+    name: "Property 15: Balance accuracy - balances should reflect actual token ownership",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const deployer = accounts.get('deployer')!;
+        const wallet1 = accounts.get('wallet_1')!;
+        const wallet2 = accounts.get('wallet_2')!;
+        const wallet3 = accounts.get('wallet_3')!;
+        
+        const wallets = [wallet1.address, wallet2.address, wallet3.address];
+        
+        // Property: For any principal, balance should accurately reflect token count
+        
+        // Initially all balances should be 0
+        for (const wallet of wallets) {
+            let balanceBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-balance', [types.principal(wallet)], deployer.address)
+            ]);
+            assertEquals(balanceBlock.receipts[0].result.expectOk(), types.uint(0));
+        }
+        
+        // Mint tokens to different wallets in a pattern
+        const mintPattern = [
+            { recipient: wallet1.address, count: 3 },
+            { recipient: wallet2.address, count: 2 },
+            { recipient: wallet3.address, count: 1 }
+        ];
+        
+        let tokenId = 1;
+        for (const pattern of mintPattern) {
+            for (let i = 0; i < pattern.count; i++) {
+                let mintBlock = chain.mineBlock([
+                    Tx.contractCall('sip090-nft', 'mint', [
+                        types.principal(pattern.recipient),
+                        types.ascii(`https://example.com/token/${tokenId}`)
+                    ], deployer.address)
+                ]);
+                tokenId++;
+            }
+        }
+        
+        // Verify balances match expected counts
+        for (const pattern of mintPattern) {
+            let balanceBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-balance', [types.principal(pattern.recipient)], deployer.address)
+            ]);
+            assertEquals(balanceBlock.receipts[0].result.expectOk(), types.uint(pattern.count));
+        }
+        
+        // Transfer a token and verify balances update
+        let transferBlock = chain.mineBlock([
+            Tx.contractCall('sip090-nft', 'transfer', [
+                types.uint(1), // Token owned by wallet1
+                types.principal(wallet1.address),
+                types.principal(wallet2.address)
+            ], wallet1.address)
+        ]);
+        
+        // Verify updated balances
+        let wallet1BalanceBlock = chain.mineBlock([
+            Tx.contractCall('sip090-nft', 'get-balance', [types.principal(wallet1.address)], deployer.address)
+        ]);
+        assertEquals(wallet1BalanceBlock.receipts[0].result.expectOk(), types.uint(2)); // 3 - 1
+        
+        let wallet2BalanceBlock = chain.mineBlock([
+            Tx.contractCall('sip090-nft', 'get-balance', [types.principal(wallet2.address)], deployer.address)
+        ]);
+        assertEquals(wallet2BalanceBlock.receipts[0].result.expectOk(), types.uint(3)); // 2 + 1
+    },
+});
