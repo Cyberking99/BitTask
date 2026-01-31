@@ -358,3 +358,63 @@ Clarinet.test({
         }
     },
 });
+// **Feature: sip090-token, Property 9: Approval revocation**
+// **Validates: Requirements 3.4**
+Clarinet.test({
+    name: "Property 9: Approval revocation - revoked operators should not be able to transfer",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const deployer = accounts.get('deployer')!;
+        const wallet1 = accounts.get('wallet_1')!;
+        const wallet2 = accounts.get('wallet_2')!;
+        const wallet3 = accounts.get('wallet_3')!;
+        
+        // Property: For any approval that is revoked, operator should no longer transfer
+        for (let tokenId = 1; tokenId <= 2; tokenId++) {
+            // Mint token
+            let mintBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'mint', [
+                    types.principal(wallet1.address),
+                    types.ascii(`https://example.com/token/${tokenId}`)
+                ], deployer.address)
+            ]);
+            
+            // Approve operator
+            let approveBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'approve', [
+                    types.principal(wallet2.address),
+                    types.uint(tokenId)
+                ], wallet1.address)
+            ]);
+            
+            // Verify approval exists
+            let getApprovedBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-approved', [types.uint(tokenId)], deployer.address)
+            ]);
+            assertEquals(getApprovedBlock.receipts[0].result.expectOk().expectSome(), wallet2.address);
+            
+            // Revoke approval
+            let revokeBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'revoke-approval', [types.uint(tokenId)], wallet1.address)
+            ]);
+            assertEquals(revokeBlock.receipts[0].result.expectOk(), types.bool(true));
+            
+            // Verify approval is gone
+            let getApprovedAfterBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-approved', [types.uint(tokenId)], deployer.address)
+            ]);
+            assertEquals(getApprovedAfterBlock.receipts[0].result.expectOk(), types.none());
+            
+            // Operator should no longer be able to transfer
+            let transferBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'transfer-from', [
+                    types.uint(tokenId),
+                    types.principal(wallet1.address),
+                    types.principal(wallet3.address)
+                ], wallet2.address)
+            ]);
+            
+            // Should fail with ERR-NOT-AUTHORIZED (401)
+            transferBlock.receipts[0].result.expectErr(types.uint(401));
+        }
+    },
+});
