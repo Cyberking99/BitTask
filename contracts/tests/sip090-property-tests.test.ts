@@ -736,3 +736,63 @@ Clarinet.test({
         assertEquals(wallet2BalanceBlock.receipts[0].result.expectOk(), types.uint(3)); // 2 + 1
     },
 });
+// **Feature: sip090-token, Property 16: Token ID sequencing**
+// **Validates: Requirements 5.4**
+Clarinet.test({
+    name: "Property 16: Token ID sequencing - token IDs should be sequential starting from 1",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const deployer = accounts.get('deployer')!;
+        const wallet1 = accounts.get('wallet_1')!;
+        
+        // Property: For any sequence of mints, token IDs should be sequential starting from 1
+        
+        const numberOfTokens = 10;
+        const mintedTokenIds: number[] = [];
+        
+        // Mint tokens and collect returned IDs
+        for (let i = 1; i <= numberOfTokens; i++) {
+            let mintBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'mint', [
+                    types.principal(wallet1.address),
+                    types.ascii(`https://example.com/token/${i}`)
+                ], deployer.address)
+            ]);
+            
+            const returnedId = mintBlock.receipts[0].result.expectOk();
+            mintedTokenIds.push(Number(returnedId.value));
+            
+            // Each mint should return the expected sequential ID
+            assertEquals(returnedId, types.uint(i));
+        }
+        
+        // Verify all IDs are sequential
+        for (let i = 0; i < mintedTokenIds.length; i++) {
+            assertEquals(mintedTokenIds[i], i + 1);
+        }
+        
+        // Verify last token ID matches the count
+        let lastTokenIdBlock = chain.mineBlock([
+            Tx.contractCall('sip090-nft', 'get-last-token-id', [], deployer.address)
+        ]);
+        assertEquals(lastTokenIdBlock.receipts[0].result.expectOk(), types.uint(numberOfTokens));
+        
+        // Verify all tokens exist in sequence
+        for (let tokenId = 1; tokenId <= numberOfTokens; tokenId++) {
+            let existsBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'token-exists', [types.uint(tokenId)], deployer.address)
+            ]);
+            assertEquals(existsBlock.receipts[0].result, types.bool(true));
+            
+            let ownerBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-owner', [types.uint(tokenId)], deployer.address)
+            ]);
+            assertEquals(ownerBlock.receipts[0].result.expectOk().expectSome(), wallet1.address);
+        }
+        
+        // Verify no gaps - token after last should not exist
+        let nonExistentBlock = chain.mineBlock([
+            Tx.contractCall('sip090-nft', 'token-exists', [types.uint(numberOfTokens + 1)], deployer.address)
+        ]);
+        assertEquals(nonExistentBlock.receipts[0].result, types.bool(false));
+    },
+});
