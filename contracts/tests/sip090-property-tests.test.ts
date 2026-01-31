@@ -418,3 +418,64 @@ Clarinet.test({
         }
     },
 });
+// **Feature: sip090-token, Property 10: Transfer clears approvals**
+// **Validates: Requirements 3.5**
+Clarinet.test({
+    name: "Property 10: Transfer clears approvals - transfers should automatically clear approvals",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const deployer = accounts.get('deployer')!;
+        const wallet1 = accounts.get('wallet_1')!;
+        const wallet2 = accounts.get('wallet_2')!;
+        const wallet3 = accounts.get('wallet_3')!;
+        
+        // Property: For any token transfer, existing approvals should be cleared
+        for (let tokenId = 1; tokenId <= 3; tokenId++) {
+            // Mint token
+            let mintBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'mint', [
+                    types.principal(wallet1.address),
+                    types.ascii(`https://example.com/token/${tokenId}`)
+                ], deployer.address)
+            ]);
+            
+            // Approve operator
+            let approveBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'approve', [
+                    types.principal(wallet2.address),
+                    types.uint(tokenId)
+                ], wallet1.address)
+            ]);
+            
+            // Verify approval exists
+            let getApprovedBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-approved', [types.uint(tokenId)], deployer.address)
+            ]);
+            assertEquals(getApprovedBlock.receipts[0].result.expectOk().expectSome(), wallet2.address);
+            
+            // Transfer token (owner transfers directly)
+            let transferBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'transfer', [
+                    types.uint(tokenId),
+                    types.principal(wallet1.address),
+                    types.principal(wallet3.address)
+                ], wallet1.address)
+            ]);
+            assertEquals(transferBlock.receipts[0].result.expectOk(), types.bool(true));
+            
+            // Verify approval was cleared
+            let getApprovedAfterBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-approved', [types.uint(tokenId)], deployer.address)
+            ]);
+            assertEquals(getApprovedAfterBlock.receipts[0].result.expectOk(), types.none());
+            
+            // Previous operator should no longer be approved
+            let isApprovedBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'is-approved-for', [
+                    types.uint(tokenId),
+                    types.principal(wallet2.address)
+                ], deployer.address)
+            ]);
+            assertEquals(isApprovedBlock.receipts[0].result, types.bool(false));
+        }
+    },
+});
