@@ -216,3 +216,39 @@ Clarinet.test({
         }
     },
 });
+// **Feature: sip090-token, Property 6: Invalid recipient rejection**
+// **Validates: Requirements 2.3**
+Clarinet.test({
+    name: "Property 6: Invalid recipient rejection - transfers to invalid principals should fail",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const deployer = accounts.get('deployer')!;
+        const wallet1 = accounts.get('wallet_1')!;
+        
+        // Mint token
+        let mintBlock = chain.mineBlock([
+            Tx.contractCall('sip090-nft', 'mint', [
+                types.principal(wallet1.address),
+                types.ascii("https://example.com/token/1")
+            ], deployer.address)
+        ]);
+        
+        // Property: For any transfer to invalid principal, transaction should be rejected
+        // Test safe-transfer which has validation (regular transfer allows any principal)
+        let invalidTransferBlock = chain.mineBlock([
+            Tx.contractCall('sip090-nft', 'safe-transfer', [
+                types.uint(1),
+                types.principal(wallet1.address),
+                types.principal('SP000000000000000000002Q6VF78') // Invalid/burn address
+            ], wallet1.address)
+        ]);
+        
+        // Should fail with ERR-INVALID-RECIPIENT (400)
+        invalidTransferBlock.receipts[0].result.expectErr(types.uint(400));
+        
+        // Verify ownership unchanged
+        let ownerBlock = chain.mineBlock([
+            Tx.contractCall('sip090-nft', 'get-owner', [types.uint(1)], deployer.address)
+        ]);
+        assertEquals(ownerBlock.receipts[0].result.expectOk().expectSome(), wallet1.address);
+    },
+});
