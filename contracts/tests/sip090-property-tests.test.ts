@@ -80,3 +80,38 @@ Clarinet.test({
         }
     },
 });
+// **Feature: sip090-token, Property 3: Last token ID accuracy**
+// **Validates: Requirements 1.5**
+Clarinet.test({
+    name: "Property 3: Last token ID accuracy - get-last-token-id should return highest minted ID",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const deployer = accounts.get('deployer')!;
+        const wallet1 = accounts.get('wallet_1')!;
+        
+        // Initial state - no tokens minted
+        let initialBlock = chain.mineBlock([
+            Tx.contractCall('sip090-nft', 'get-last-token-id', [], deployer.address)
+        ]);
+        assertEquals(initialBlock.receipts[0].result.expectOk(), types.uint(0));
+        
+        // Property: For any number of mints, last-token-id should equal the count
+        for (let expectedId = 1; expectedId <= 10; expectedId++) {
+            // Mint one token
+            let mintBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'mint', [
+                    types.principal(wallet1.address),
+                    types.ascii(`https://example.com/token/${expectedId}`)
+                ], deployer.address)
+            ]);
+            
+            // Verify mint returned correct ID
+            assertEquals(mintBlock.receipts[0].result.expectOk(), types.uint(expectedId));
+            
+            // Verify get-last-token-id returns the expected ID
+            let lastIdBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-last-token-id', [], deployer.address)
+            ]);
+            assertEquals(lastIdBlock.receipts[0].result.expectOk(), types.uint(expectedId));
+        }
+    },
+});
