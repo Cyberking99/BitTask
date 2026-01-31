@@ -252,3 +252,62 @@ Clarinet.test({
         assertEquals(ownerBlock.receipts[0].result.expectOk().expectSome(), wallet1.address);
     },
 });
+// **Feature: sip090-token, Property 7: Approval management consistency**
+// **Validates: Requirements 3.1, 3.3**
+Clarinet.test({
+    name: "Property 7: Approval management consistency - approvals should be recorded and queryable",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const deployer = accounts.get('deployer')!;
+        const wallet1 = accounts.get('wallet_1')!;
+        const wallet2 = accounts.get('wallet_2')!;
+        const wallet3 = accounts.get('wallet_3')!;
+        
+        // Mint tokens to test approval on
+        let mintBlock = chain.mineBlock([
+            Tx.contractCall('sip090-nft', 'mint', [
+                types.principal(wallet1.address),
+                types.ascii("https://example.com/token/1")
+            ], deployer.address),
+            Tx.contractCall('sip090-nft', 'mint', [
+                types.principal(wallet1.address),
+                types.ascii("https://example.com/token/2")
+            ], deployer.address)
+        ]);
+        
+        // Property: For any token owner approving an operator, approval should be recorded accurately
+        const approvalTests = [
+            { tokenId: 1, owner: wallet1.address, operator: wallet2.address },
+            { tokenId: 2, owner: wallet1.address, operator: wallet3.address },
+            { tokenId: 1, owner: wallet1.address, operator: wallet3.address }, // Change approval
+        ];
+        
+        for (const test of approvalTests) {
+            // Set approval
+            let approveBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'approve', [
+                    types.principal(test.operator),
+                    types.uint(test.tokenId)
+                ], test.owner)
+            ]);
+            
+            assertEquals(approveBlock.receipts[0].result.expectOk(), types.bool(true));
+            
+            // Verify approval is queryable
+            let getApprovedBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-approved', [types.uint(test.tokenId)], deployer.address)
+            ]);
+            
+            assertEquals(getApprovedBlock.receipts[0].result.expectOk().expectSome(), test.operator);
+            
+            // Verify is-approved-for returns true
+            let isApprovedBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'is-approved-for', [
+                    types.uint(test.tokenId),
+                    types.principal(test.operator)
+                ], deployer.address)
+            ]);
+            
+            assertEquals(isApprovedBlock.receipts[0].result, types.bool(true));
+        }
+    },
+});
