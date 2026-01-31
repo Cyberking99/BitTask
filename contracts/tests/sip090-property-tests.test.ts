@@ -115,3 +115,54 @@ Clarinet.test({
         }
     },
 });
+// **Feature: sip090-token, Property 4: Transfer ownership update**
+// **Validates: Requirements 2.1, 2.4, 2.5**
+Clarinet.test({
+    name: "Property 4: Transfer ownership update - transfers should update ownership correctly",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const deployer = accounts.get('deployer')!;
+        const wallet1 = accounts.get('wallet_1')!;
+        const wallet2 = accounts.get('wallet_2')!;
+        const wallet3 = accounts.get('wallet_3')!;
+        
+        const recipients = [wallet1.address, wallet2.address, wallet3.address];
+        
+        // Property: For any valid token transfer by owner, ownership should update correctly
+        for (let i = 0; i < recipients.length; i++) {
+            // Mint token to first recipient
+            let mintBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'mint', [
+                    types.principal(recipients[0]),
+                    types.ascii(`https://example.com/token/${i + 1}`)
+                ], deployer.address)
+            ]);
+            
+            const tokenId = i + 1;
+            let currentOwner = recipients[0];
+            
+            // Transfer through all recipients
+            for (let j = 1; j < recipients.length; j++) {
+                const newOwner = recipients[j];
+                
+                // Execute transfer
+                let transferBlock = chain.mineBlock([
+                    Tx.contractCall('sip090-nft', 'transfer', [
+                        types.uint(tokenId),
+                        types.principal(currentOwner),
+                        types.principal(newOwner)
+                    ], currentOwner)
+                ]);
+                
+                assertEquals(transferBlock.receipts[0].result.expectOk(), types.bool(true));
+                
+                // Verify ownership updated immediately
+                let ownerBlock = chain.mineBlock([
+                    Tx.contractCall('sip090-nft', 'get-owner', [types.uint(tokenId)], deployer.address)
+                ]);
+                
+                assertEquals(ownerBlock.receipts[0].result.expectOk().expectSome(), newOwner);
+                currentOwner = newOwner;
+            }
+        }
+    },
+});
