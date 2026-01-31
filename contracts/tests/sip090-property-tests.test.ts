@@ -479,3 +479,58 @@ Clarinet.test({
         }
     },
 });
+// **Feature: sip090-token, Property 11: Mint creates token correctly**
+// **Validates: Requirements 4.1, 4.3, 4.5**
+Clarinet.test({
+    name: "Property 11: Mint creates token correctly - mints should create tokens with correct properties",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const deployer = accounts.get('deployer')!;
+        const recipients = [
+            accounts.get('wallet_1')!.address,
+            accounts.get('wallet_2')!.address,
+            accounts.get('wallet_3')!.address
+        ];
+        
+        // Property: For any mint by contract owner, token should be created correctly
+        for (let i = 0; i < recipients.length; i++) {
+            const expectedTokenId = i + 1;
+            const recipient = recipients[i];
+            const uri = `https://example.com/token/${expectedTokenId}`;
+            
+            // Get initial total supply
+            let initialSupplyBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-total-supply', [], deployer.address)
+            ]);
+            const initialSupply = initialSupplyBlock.receipts[0].result.expectOk();
+            
+            // Mint token
+            let mintBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'mint', [
+                    types.principal(recipient),
+                    types.ascii(uri)
+                ], deployer.address)
+            ]);
+            
+            // Should return correct token ID
+            assertEquals(mintBlock.receipts[0].result.expectOk(), types.uint(expectedTokenId));
+            
+            // Verify token owner is correct
+            let ownerBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-owner', [types.uint(expectedTokenId)], deployer.address)
+            ]);
+            assertEquals(ownerBlock.receipts[0].result.expectOk().expectSome(), recipient);
+            
+            // Verify token URI is correct
+            let uriBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-token-uri', [types.uint(expectedTokenId)], deployer.address)
+            ]);
+            assertEquals(uriBlock.receipts[0].result.expectOk().expectSome(), types.ascii(uri));
+            
+            // Verify total supply incremented
+            let newSupplyBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-total-supply', [], deployer.address)
+            ]);
+            assertEquals(newSupplyBlock.receipts[0].result.expectOk(), types.uint(expectedTokenId));
+        }
+    },
+});
