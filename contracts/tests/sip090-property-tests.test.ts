@@ -311,3 +311,50 @@ Clarinet.test({
         }
     },
 });
+// **Feature: sip090-token, Property 8: Approved operator transfer**
+// **Validates: Requirements 3.2**
+Clarinet.test({
+    name: "Property 8: Approved operator transfer - approved operators should be able to transfer",
+    async fn(chain: Chain, accounts: Map<string, Account>) {
+        const deployer = accounts.get('deployer')!;
+        const wallet1 = accounts.get('wallet_1')!;
+        const wallet2 = accounts.get('wallet_2')!;
+        const wallet3 = accounts.get('wallet_3')!;
+        
+        // Property: For any approved operator, they should be able to transfer tokens
+        for (let tokenId = 1; tokenId <= 3; tokenId++) {
+            // Mint token
+            let mintBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'mint', [
+                    types.principal(wallet1.address),
+                    types.ascii(`https://example.com/token/${tokenId}`)
+                ], deployer.address)
+            ]);
+            
+            // Approve operator
+            let approveBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'approve', [
+                    types.principal(wallet2.address),
+                    types.uint(tokenId)
+                ], wallet1.address)
+            ]);
+            
+            // Approved operator should be able to transfer
+            let transferBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'transfer-from', [
+                    types.uint(tokenId),
+                    types.principal(wallet1.address),
+                    types.principal(wallet3.address)
+                ], wallet2.address) // Approved operator calling
+            ]);
+            
+            assertEquals(transferBlock.receipts[0].result.expectOk(), types.bool(true));
+            
+            // Verify ownership changed
+            let ownerBlock = chain.mineBlock([
+                Tx.contractCall('sip090-nft', 'get-owner', [types.uint(tokenId)], deployer.address)
+            ]);
+            assertEquals(ownerBlock.receipts[0].result.expectOk().expectSome(), wallet3.address);
+        }
+    },
+});
